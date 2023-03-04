@@ -434,7 +434,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return null;
         }
 
-        $order->add_meta_data($this->id . '_checkout_id', $response['checkoutId']);
+        $existingCheckout = $order->get_meta($this->id . '_checkout_id');
+
+        if (isset($existingCheckout) && $existingCheckout !== '') {
+            $order->add_meta_data($this->id . '_checkout_id_old', $existingCheckout);
+        }
+        
+        $order->update_meta_data($this->id . '_checkout_id', $response['checkoutId']);
         $order->add_meta_data($this->id . '_authorization_type', $this->manual_capture);
         $order->save_meta_data();
 
