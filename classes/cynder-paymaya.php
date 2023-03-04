@@ -784,6 +784,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if ($authorizationTypeMetadata->value === 'none') {
             /** For non-manual capture payments: */
 
+            if ($order->is_paid()) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Cannot process payment ' . $transactionRefNumber . ' with ' . $status . ' status.');
+
+                status_header(204);
+                die();
+            }
+
             /** With correct data based on assumptions */
             if (abs($amountPaid-floatval($order->get_total())) < PHP_FLOAT_EPSILON && $status === 'PAYMENT_SUCCESS') {
                 $order->payment_complete($transactionRefNumber);
