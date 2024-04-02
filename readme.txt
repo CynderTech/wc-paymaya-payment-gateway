@@ -1,9 +1,9 @@
 === Maya Business Plugin ===
 Tags: payments, credit card
 Requires at least: 5.0
-Tested up to: 6.3.2
+Tested up to: 6.4.3
 Requires PHP: 5.6
-Stable tag: 1.1.3
+Stable tag: 1.1.4
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -50,6 +50,10 @@ To test payments, enable **Sandbox Mode**. This will let you transact test payme
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= 1.1.4 =
+*Release Date - April 2, 2024*
+* Tested compatibility for WP 6.4.3 and WC 8.7
 
 = 1.1.3 =
 *Release Date - November 6, 2023*
