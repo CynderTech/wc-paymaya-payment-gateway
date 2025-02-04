@@ -40,6 +40,12 @@ function Paymaya_Woocommerce_Missing_Cynder_notice()
     ) . '</strong></p></div>';
 }
 
+add_action( 'before_woocommerce_init', function() {
+	if ( class_exists( \Automattic\WooCommerce\Utilities\FeaturesUtil::class ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+	}
+} );
+
 /**
  * Initialize Paymaya Gateway Class
  *
@@ -247,3 +253,20 @@ function Paymaya_Init_Gateway_class()
 }
 
 add_action('plugins_loaded', 'paymaya_init_gateway_class');
+
+add_action( 'woocommerce_blocks_loaded', 'woocommerce_gateway_maya_woocommerce_block_support' );
+
+function woocommerce_gateway_maya_woocommerce_block_support() {
+    if ( class_exists( 'Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) {
+		$fileDir = dirname(__FILE__);
+        include_once $fileDir.'/classes/cynder-paymaya-wc-blocks.php';
+		add_action(
+			'woocommerce_blocks_payment_method_type_registration',
+			function( Automattic\WooCommerce\Blocks\Payments\PaymentMethodRegistry $payment_method_registry ) {
+                $payment_method_registry->register( new Cynder_Paymaya_WC_Blocks );
+                
+			},
+			5
+		);
+	}
+}
