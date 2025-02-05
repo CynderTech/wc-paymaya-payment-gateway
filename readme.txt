@@ -52,8 +52,9 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 == Changelog ==
 
 = 1.1.5 =
-*Release Date - February 4, 2025*
+*Release Date - February 5, 2025*
 [FIX] Webhook registration error handling
+[FIX] Added High-Performance Order Storage(HPOS) compatibility
 [CHORE] Tested compatibility for WP 6.7.1 and WC 9.6
 
 = 1.1.4 =
