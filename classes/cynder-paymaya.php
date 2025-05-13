@@ -235,6 +235,20 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
     }
 
+    function process_error($response) {
+        if ($this->debug_mode) {
+            wc_get_logger()->log('error', '[Registering Webhooks] ' . wc_print_r($response, true));
+        }
+
+        if (isset($response["error"]["error"])) {
+            $this->add_error($response["error"]["error"]);
+        } else if (isset($response["error"]["message"])) {
+            $this->add_error($response["error"]["message"]);
+        } else {
+            $this->add_error($response["error"]);
+        }
+    }
+
     public function process_admin_options() {
         $is_options_saved = parent::process_admin_options();
 
@@ -245,68 +259,60 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if (isset($this->enabled) && $this->enabled === 'yes' && isset($this->public_key) && isset($this->secret_key)) {
             $webhooks = $this->client->retrieveWebhooks();
 
-            if ($this->debug_mode) {
-                wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
-            }
-
-            function parse_error($webhooks) {
-                if (isset($webhooks["error"]["message"])) {
-                    $this->add_error($webhooks["error"]["message"]);
-                } else {
-                    $this->add_error($webhooks["error"]);
-                }
-            }
-
             if (array_key_exists("error", $webhooks)) {
-                parse_error($webhooks);
-            }
+                $this->process_error($webhooks);
+            } else {
+                if ($this->debug_mode) {
+                    wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
+                }
 
-            wc_get_logger()->log('info', 'valid webhooks' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
-
-            foreach($webhooks as $webhook) {
-                /**
-                 * Only override webhook names that are being used by the plugin, disregard the rest
-                 */
-
-                wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
-
-                if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS)) {
-                    $deletedWebhook = $this->client->deleteWebhook($webhook["id"]);
-
-                    if (array_key_exists("error", $deletedWebhook)) {
-                        parse_error($deletedWebhook);
+                wc_get_logger()->log('info', 'valid webhooks: ' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
+    
+                foreach($webhooks as $webhook) {
+                    /**
+                     * Only override webhook names that are being used by the plugin, disregard the rest
+                     */
+    
+                    wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
+    
+                    if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS)) {
+                        $deletedWebhook = $this->client->deleteWebhook($webhook["id"]);
+    
+                        if (array_key_exists("error", $deletedWebhook)) {
+                            $this->process_error($deletedWebhook);
+                        }
                     }
                 }
-            }
-
-            $createdWebhook = $this->client->createWebhook('CHECKOUT_SUCCESS', $webhookSuccessUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('CHECKOUT_FAILURE',$webhookFailureUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('PAYMENT_SUCCESS', $webhookPaymentUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('PAYMENT_FAILED', $webhookPaymentUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
+    
+                $createdWebhook = $this->client->createWebhook('CHECKOUT_SUCCESS', $webhookSuccessUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('CHECKOUT_FAILURE',$webhookFailureUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('PAYMENT_SUCCESS', $webhookPaymentUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('PAYMENT_FAILED', $webhookPaymentUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
             }
 
             $this->display_errors();
