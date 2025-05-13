@@ -747,13 +747,54 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         die();
     }
 
+    function get_source() {
+        if (getenv('HTTP_CF_CONNECTING_IP')) return getenv('HTTP_CF_CONNECTING_IP');
+        if (getenv('HTTP_X_FORWARDED_FOR')) return getenv('HTTP_X_FORWARDED_FOR');
+        if (getenv('HTTP_X_FORWARDED_BY')) return getenv('HTTP_X_FORWARDED_BY');
+        if (getenv('HTTP_X_CLIENT_IP')) return getenv('HTTP_X_CLIENT_IP');
+        if (getenv('HTTP_CLIENT_IP')) return getenv('HTTP_CLIENT_IP');
+        if (getenv('REMOTE_ADDR')) return getenv('REMOTE_ADDR');
+    }
+
+    function is_valid_source($source) {
+        if ($this->sandbox === 'yes') {
+            return in_array(
+                $source,
+                array(
+                    '13.229.160.234',
+                    '3.1.199.75'
+                )
+            );
+        }
+
+        return in_array(
+            $source,
+            array(
+                '18.138.50.235',
+                '3.1.207.200'
+            )
+        );
+    }
+
     function handle_payment_webhook_request() {
         $isPostRequest = $_SERVER['REQUEST_METHOD'] === 'POST';
         $wcApiQuery = sanitize_text_field($_GET['wc-api']);
         $hasWcApiQuery = isset($wcApiQuery);
         $hasCorrectQuery = $wcApiQuery === 'cynder_paymaya_payment';
+        $source = $this->get_source();
+        $isValidSource = $this->is_valid_source($source);
 
-        if (!$isPostRequest || !$hasWcApiQuery || !$hasCorrectQuery) {
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook request received from ' . $source);
+
+            if ($isValidSource) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Source is valid');
+            } else {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Source is invalid');
+            }
+        }
+
+        if (!$isValidSource || !$isPostRequest || !$hasWcApiQuery || !$hasCorrectQuery) {
             status_header(400);
             die();
         }

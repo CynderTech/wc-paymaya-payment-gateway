@@ -3,7 +3,7 @@ Tags: payments, credit card
 Requires at least: 5.0
 Tested up to: 6.7.1
 Requires PHP: 5.6
-Stable tag: 1.1.5
+Stable tag: 1.2.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -50,6 +50,11 @@ To test payments, enable **Sandbox Mode**. This will let you transact test payme
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= 1.2.0 =
+*Release Date - May 13, 2025*
+
+* Added source validation in webhook handler
 
 = 1.1.5 =
 *Release Date - February 5, 2025*
