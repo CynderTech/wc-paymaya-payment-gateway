@@ -323,6 +323,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     public function process_payment($orderId) {
         $order = wc_get_order($orderId);
+        
+        $orderItemArray = [];
 
         $catchRedirectUrl = get_home_url() . '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId;
 
@@ -362,6 +364,21 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $shippingZipCode = $order->get_billing_postcode();
         }
 
+        foreach ($order->get_items() as $orderItem) {
+            array_push($orderItemArray, array(
+                "name" => $orderItem->get_name(),
+                "description" => $orderItem->get_name(),
+                "quantity" => $orderItem->get_quantity(),
+                "code" => '001',
+                "amount" => array(
+                    "value" => floatval($orderItem->get_total())
+                ),
+                "totalAmount" => array(
+                    "value" => floatval($orderItem->get_total())
+                )
+            ));
+        }
+        
         $payload = array(
             "totalAmount" => array(
                 "value" => floatval($order->get_total()),
@@ -401,20 +418,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     "countryCode" => $order->get_billing_country()
                 )
             ),
-            "items" => array(
-                array(
-                    "name" => 'WooCommerce Purchase',
-                    "description" => 'WooCommerce Purchase',
-                    "quantity" => 1,
-                    "code" => '001',
-                    "amount" => array(
-                        "value" => floatval($order->get_total())
-                    ),
-                    "totalAmount" => array(
-                        "value" => floatval($order->get_total())
-                    )
-                )
-            ),
+            "items" => $orderItemArray,
             "redirectUrl" => array(
                 "success" => $catchRedirectUrl . '&status=success',
                 "failure" => $catchRedirectUrl . '&status=failed',
