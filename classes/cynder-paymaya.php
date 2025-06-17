@@ -37,7 +37,7 @@ define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array(
     'PAYMENT_EXPIRED',
 ));
 
-define('MAYA_WEBHOOK_PUBLIC_KEYS', array(
+define('MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX', array(
     <<<EOD
     -----BEGIN PUBLIC KEY-----
     MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjNkSX6p+goDPaPAYuTzT
@@ -58,6 +58,31 @@ define('MAYA_WEBHOOK_PUBLIC_KEYS', array(
     cNTP/zFHCvQaiIlLOqfgXDRPBcHPPZ2qcB99UVPAHXBKsKdtBB2w2qT2l99MlTAB
     iRy+IKtVQcQyRP7T8blegO25x35G2CZ3VCKPkmUen3eXQ4+r5fVlzEIBSfNvBwT9
     jQIDAQAB
+    -----END PUBLIC KEY-----
+    EOD
+));
+
+define('MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION', array(
+    <<<EOD
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjCGhkjg1PQe0WVHCYdTT
+    2luqzXhKfeStALWlEcMpHqYusd6dAU4vZ9bGQns/OYe/H2cIxEPvRJnRcipMKvVZ
+    pzAFEKHQLiXdeuNcxkAaxEZEwMAmFdVGmNLZbpi579r2s6Q++zYy0OHb9awY/2z0
+    OYRwV5XN7SCrqIlf1tEHfxKV2cJDCFW030nnRMoWisQ9KXG3Ihvjj4tOQimPCtzp
+    SDtlf6QFmg/WZBIOEdLro9oROztK6PwrI/yG5ZFaUCQYfY8fw0y1/PI3heEf8z5k
+    xA466LdSqCeVdGwfjKy9ZHown8XiiPI82HnBrMP3UPX4efEfopbP4SpDFOEwRNA9
+    FQIDAQAB
+    -----END PUBLIC KEY-----
+    EOD,
+    <<<EOD
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxZJxNmpNYjxFCBa2P6Ad
+    wzDDuDKOKAgiTBrQvJGuX/l2u32N4d4FYw99md16rf1iIcxD70/KG9nWrltrxbIs
+    bm9+bCHVLKMfdjaJQCBGXN/WW6W1XaGQQPft9UlmAwA/uMKTsN/2XqFjoKSJoe9e
+    Xz/p3pGn66oBTCwvzDqma46GxF92atiOt6CEcRl8P+dDKJlYY7fcxiuNMeDMOOla
+    KMxUz9nMgJ6uESK/kS8C8+hGuiCWgKeIRm/ONL5Gk/lypWzrphaKcWqpBGZxpNAL
+    AVmPY9ke4+RxyojkEre4d5sT2C21oAQVHyGewd0ttQ/bK59X17+yg5FOfRpI1BKj
+    7wIDAQAB
     -----END PUBLIC KEY-----
     EOD
 ));
@@ -1202,7 +1227,19 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Flattened Payload: '. $verifyString);
         }
         
-        return $this->array_some(MAYA_WEBHOOK_PUBLIC_KEYS, function($publicKey) use ($verifyString, $signature) {
+        if ($this->sandbox === 'yes') {
+            if ($this->debug_mode) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Using sandbox public keys');
+            }
+            $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX;
+        } else {
+            if ($this->debug_mode) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Using production public keys');
+            }
+            $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION;
+        }
+
+        return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $signature) {
             return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption");
         });
     }
