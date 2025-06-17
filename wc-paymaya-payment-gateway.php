@@ -6,7 +6,7 @@
  * Author: PayMaya
  * Author URI: https://www.paymaya.com
  * License: GPLv3
- * Version: 1.2.0
+ * Version: 1.3.0
  * Requires at least: 5.3
  * Tested up to: 6.8.1
  * WC requires at least: 3.9.3
