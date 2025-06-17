@@ -1,7 +1,7 @@
 === Maya Business Plugin ===
 Tags: payments, credit card
-Requires at least: 5.0
-Tested up to: 6.7.1
+Requires at least: 5.3
+Tested up to: 6.8.1
 Requires PHP: 5.6
 Stable tag: 1.2.0
 License: GPLv3
@@ -51,6 +51,13 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 == Changelog ==
 
+= 1.3.0 =
+*Release Date - June 17, 2025*
+
+* Additional increased security checks
+* Cart items now displayed on Maya gateway
+* Tested compatibility for WP 6.7.2 and WC 9.9.4
+
 = 1.2.0 =
 *Release Date - May 13, 2025*
 
@@ -60,7 +67,7 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 *Release Date - February 5, 2025*
 [FIX] Webhook registration error handling
 [FIX] Added High-Performance Order Storage(HPOS) compatibility
-[CHORE] Tested compatibility for WP 6.7.1 and WC 9.6
+[CHORE] Tested compatibility for WP 6.7 and WC 9.6
 
 = 1.1.4 =
 *Release Date - April 2, 2024*

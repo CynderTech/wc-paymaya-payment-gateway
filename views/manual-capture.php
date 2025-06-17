@@ -3,17 +3,17 @@
         <tr>
             <td class="label">Authorization Type:</td>
             <td width="1%"></td>
-            <td class="total" style="font-weight: 700;"><?php echo strtoupper($authorizationType) ?></td>
+            <td class="total" style="font-weight: 700;"><?php echo esc_html(strtoupper($authorizationType)) ?></td>
         </tr>
         <tr>
             <td class="label">Amount already captured:</td>
             <td width="1%"></td>
-            <td class="total"><?php echo wc_price($capturedAmount, $order->get_currency()) ?></td>
+            <td class="total"><?php echo esc_html(wc_price($capturedAmount, $order->get_currency())) ?></td>
         </tr>
         <tr>
             <td class="label">Remaining order total:</td>
             <td width="1%"></td>
-            <td class="total"><?php echo wc_price($balance, $order->get_currency()) ?></td>
+            <td class="total"><?php echo esc_html(wc_price($balance, $order->get_currency())) ?></td>
         </tr>
     </table>
 </div>
@@ -24,21 +24,21 @@
                 <td class="label">Authorized total:</td>
                 <td width="1%"></td>
                 <td class="total total-authorized">
-                    <span class="woocommerce-Price-amount amount"><?php echo wc_price($authorizedAmount, $order->get_currency()) ?></span>
+                    <span class="woocommerce-Price-amount amount"><?php echo esc_html(wc_price($authorizedAmount, $order->get_currency())) ?></span>
                 </td>
             </tr>
             <tr>
                 <td class="label">Amount already captured:</td>
                 <td width="1%"></td>
                 <td class="total total-captured">
-                    <span class="woocommerce-Price-amount amount"><?php echo wc_price($capturedAmount, $order->get_currency()) ?></span>
+                    <span class="woocommerce-Price-amount amount"><?php echo esc_html(wc_price($capturedAmount, $order->get_currency())) ?></span>
                 </td>
             </tr>
             <tr>
                 <td class="label">Remaining order total:</td>
                 <td width="1%"></td>
                 <td class="total total-remaining">
-                    <span class="woocommerce-Price-amount amount"><?php echo wc_price($balance, $order->get_currency()) ?></span>
+                    <span class="woocommerce-Price-amount amount"><?php echo esc_html(wc_price($balance, $order->get_currency())) ?></span>
                 </td>
             </tr>
             <tr>

@@ -5,11 +5,12 @@
  * Description: Take credit and debit card payments via Maya.
  * Author: PayMaya
  * Author URI: https://www.paymaya.com
+ * License: GPLv3
  * Version: 1.2.0
- * Requires at least: 5.3.2
- * Tested up to: 6.7.1
+ * Requires at least: 5.3
+ * Tested up to: 6.8.1
  * WC requires at least: 3.9.3
- * WC tested up to: 9.6.0
+ * WC tested up to: 9.9.4
  *
  * @category Plugin
  * @package  CynderTech
@@ -29,12 +30,11 @@ if (!defined('ABSPATH')) {
  */
 function Paymaya_Woocommerce_Missing_Cynder_notice()
 {
-    /* translators: 1. URL link. */
     echo '<div class="error"><p><strong>' . sprintf(
+        /* translators: 1. URL link. */
         esc_html__(
-            'Maya requires WooCommerce to be '
-            . 'installed and active. You can download %s here.',
-            'woocommerce-gateway-paymaya'
+            'Maya requires WooCommerce to be installed and active. You can download %s here.',
+            'wc-paymaya-payment-gateway'
         ),
         '<a href="https://woocommerce.com/" target="_blank">WooCommerce</a>'
     ) . '</strong></p></div>';
@@ -194,10 +194,9 @@ function Paymaya_Init_Gateway_class()
             {
                 unset($sections['paymaya']);
 
-                $gatewayName = 'woocommerce-gateway-paymaya';
                 $sections['paymaya'] = __(
                     'Payments via Maya',
-                    $gatewayName
+                    'wc-paymaya-payment-gateway'
                 );
 
                 $sections = [];

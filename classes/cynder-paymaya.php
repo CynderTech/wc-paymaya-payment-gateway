@@ -37,6 +37,56 @@ define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array(
     'PAYMENT_EXPIRED',
 ));
 
+define('MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX', array(
+    <<<EOD
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjNkSX6p+goDPaPAYuTzT
+    zKTCBeLhh8FkPMbZxDKTUxF93dOwiC7jsdx7KyopupeLosiVlbs+gpAJ7XBQP/Ex
+    giyzXC9TljpyvkUQfyRPMAMKq+BzxdUliTl6hgrLBsH28CP5FuPHCsfxDXe7mDtv
+    9H4mP3SKO0HfkZ45tudxD9CWbwWKF0lU9LRbLlJ0y7KEaK7Rv9fI1Dp/KPT+9pls
+    tU+CPNKaxJjGRKGuxW2AOCabSD0cTZNXki+K51mNoma7Mj1HMhnsR68FGJvCqk1q
+    Wsr3q8+EUMVPBMX+5nKATfZYGvxg4ytzT8pnEVeWl6phYKviB9aVVwurh1gDJB4r
+    lQIDAQAB
+    -----END PUBLIC KEY-----
+    EOD,
+    <<<EOD
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp14gezqq4dGWu7EZ7BHx
+    8wD3y1hqxwQR7UYPXtXJP+WngN4wqwatjsnQaRGnmdPRG8VEzUzw9PlR7t7P24uW
+    +J08xBrtTVouD2MKglcIcy13rt1XL79zr/LIAFMFI6f4O8/OQi1xsGsZ6xarD+wl
+    OQKG4W66I3yp2jNAbge25eSPuo0BNqPWvebMcIYJu4f3Fxu1eDgeM6zCEqLc6+jX
+    cNTP/zFHCvQaiIlLOqfgXDRPBcHPPZ2qcB99UVPAHXBKsKdtBB2w2qT2l99MlTAB
+    iRy+IKtVQcQyRP7T8blegO25x35G2CZ3VCKPkmUen3eXQ4+r5fVlzEIBSfNvBwT9
+    jQIDAQAB
+    -----END PUBLIC KEY-----
+    EOD
+));
+
+define('MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION', array(
+    <<<EOD
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjCGhkjg1PQe0WVHCYdTT
+    2luqzXhKfeStALWlEcMpHqYusd6dAU4vZ9bGQns/OYe/H2cIxEPvRJnRcipMKvVZ
+    pzAFEKHQLiXdeuNcxkAaxEZEwMAmFdVGmNLZbpi579r2s6Q++zYy0OHb9awY/2z0
+    OYRwV5XN7SCrqIlf1tEHfxKV2cJDCFW030nnRMoWisQ9KXG3Ihvjj4tOQimPCtzp
+    SDtlf6QFmg/WZBIOEdLro9oROztK6PwrI/yG5ZFaUCQYfY8fw0y1/PI3heEf8z5k
+    xA466LdSqCeVdGwfjKy9ZHown8XiiPI82HnBrMP3UPX4efEfopbP4SpDFOEwRNA9
+    FQIDAQAB
+    -----END PUBLIC KEY-----
+    EOD,
+    <<<EOD
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxZJxNmpNYjxFCBa2P6Ad
+    wzDDuDKOKAgiTBrQvJGuX/l2u32N4d4FYw99md16rf1iIcxD70/KG9nWrltrxbIs
+    bm9+bCHVLKMfdjaJQCBGXN/WW6W1XaGQQPft9UlmAwA/uMKTsN/2XqFjoKSJoe9e
+    Xz/p3pGn66oBTCwvzDqma46GxF92atiOt6CEcRl8P+dDKJlYY7fcxiuNMeDMOOla
+    KMxUz9nMgJ6uESK/kS8C8+hGuiCWgKeIRm/ONL5Gk/lypWzrphaKcWqpBGZxpNAL
+    AVmPY9ke4+RxyojkEre4d5sT2C21oAQVHyGewd0ttQ/bK59X17+yg5FOfRpI1BKj
+    7wIDAQAB
+    -----END PUBLIC KEY-----
+    EOD
+));
+
 /**
  * Paymaya Class
  * 
@@ -235,6 +285,20 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
     }
 
+    function process_error($response) {
+        if ($this->debug_mode) {
+            wc_get_logger()->log('error', '[Registering Webhooks] ' . wc_print_r($response, true));
+        }
+
+        if (isset($response["error"]["error"])) {
+            $this->add_error($response["error"]["error"]);
+        } else if (isset($response["error"]["message"])) {
+            $this->add_error($response["error"]["message"]);
+        } else {
+            $this->add_error($response["error"]);
+        }
+    }
+
     public function process_admin_options() {
         $is_options_saved = parent::process_admin_options();
 
@@ -245,68 +309,60 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if (isset($this->enabled) && $this->enabled === 'yes' && isset($this->public_key) && isset($this->secret_key)) {
             $webhooks = $this->client->retrieveWebhooks();
 
-            if ($this->debug_mode) {
-                wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
-            }
-
-            function parse_error($webhooks) {
-                if (isset($webhooks["error"]["message"])) {
-                    $this->add_error($webhooks["error"]["message"]);
-                } else {
-                    $this->add_error($webhooks["error"]);
-                }
-            }
-
             if (array_key_exists("error", $webhooks)) {
-                parse_error($webhooks);
-            }
+                $this->process_error($webhooks);
+            } else {
+                if ($this->debug_mode) {
+                    wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
+                }
 
-            wc_get_logger()->log('info', 'valid webhooks' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
-
-            foreach($webhooks as $webhook) {
-                /**
-                 * Only override webhook names that are being used by the plugin, disregard the rest
-                 */
-
-                wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
-
-                if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS)) {
-                    $deletedWebhook = $this->client->deleteWebhook($webhook["id"]);
-
-                    if (array_key_exists("error", $deletedWebhook)) {
-                        parse_error($deletedWebhook);
+                wc_get_logger()->log('info', 'valid webhooks: ' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
+    
+                foreach($webhooks as $webhook) {
+                    /**
+                     * Only override webhook names that are being used by the plugin, disregard the rest
+                     */
+    
+                    wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
+    
+                    if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS)) {
+                        $deletedWebhook = $this->client->deleteWebhook($webhook["id"]);
+    
+                        if (array_key_exists("error", $deletedWebhook)) {
+                            $this->process_error($deletedWebhook);
+                        }
                     }
                 }
-            }
-
-            $createdWebhook = $this->client->createWebhook('CHECKOUT_SUCCESS', $webhookSuccessUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('CHECKOUT_FAILURE',$webhookFailureUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('PAYMENT_SUCCESS', $webhookPaymentUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('PAYMENT_FAILED', $webhookPaymentUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
-            }
-
-            $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
-
-            if (array_key_exists("error", $createdWebhook)) {
-                parse_error($createdWebhook);
+    
+                $createdWebhook = $this->client->createWebhook('CHECKOUT_SUCCESS', $webhookSuccessUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('CHECKOUT_FAILURE',$webhookFailureUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('PAYMENT_SUCCESS', $webhookPaymentUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('PAYMENT_FAILED', $webhookPaymentUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+    
+                $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
+    
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
             }
 
             $this->display_errors();
@@ -317,6 +373,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     public function process_payment($orderId) {
         $order = wc_get_order($orderId);
+        
+        $orderItemArray = [];
 
         $catchRedirectUrl = get_home_url() . '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId;
 
@@ -356,6 +414,21 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $shippingZipCode = $order->get_billing_postcode();
         }
 
+        foreach ($order->get_items() as $orderItem) {
+            array_push($orderItemArray, array(
+                "name" => $orderItem->get_name(),
+                "description" => $orderItem->get_name(),
+                "quantity" => $orderItem->get_quantity(),
+                "code" => '001',
+                "amount" => array(
+                    "value" => floatval($orderItem->get_total())
+                ),
+                "totalAmount" => array(
+                    "value" => floatval($orderItem->get_total())
+                )
+            ));
+        }
+        
         $payload = array(
             "totalAmount" => array(
                 "value" => floatval($order->get_total()),
@@ -395,20 +468,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     "countryCode" => $order->get_billing_country()
                 )
             ),
-            "items" => array(
-                array(
-                    "name" => 'WooCommerce Purchase',
-                    "description" => 'WooCommerce Purchase',
-                    "quantity" => 1,
-                    "code" => '001',
-                    "amount" => array(
-                        "value" => floatval($order->get_total())
-                    ),
-                    "totalAmount" => array(
-                        "value" => floatval($order->get_total())
-                    )
-                )
-            ),
+            "items" => $orderItemArray,
             "redirectUrl" => array(
                 "success" => $catchRedirectUrl . '&status=success',
                 "failure" => $catchRedirectUrl . '&status=failed',
@@ -757,6 +817,53 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function is_valid_source($source) {
+        $webhookTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
+        if (!$this->verify_timestamp($webhookTimestamp)) {
+            /** Exit early if validation fails */
+            return false;
+        }
+
+        $webhookSignature = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE');
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Signature ' . $webhookSignature);
+        }
+
+        $webhookSignatureArray = explode(',', $webhookSignature);
+        
+        $webhookNonce = null;
+        $webhookV1 = null;
+
+        foreach ($webhookSignatureArray as $webhookSignatureItem) {
+            if (strpos($webhookSignatureItem, "nonce=") === 0) {
+                $webhookNonce = substr($webhookSignatureItem, strlen("nonce="));
+            } elseif (strpos($webhookSignatureItem, "v1=") === 0) {
+                $webhookV1 = substr($webhookSignatureItem, strlen("v1="));
+            }
+        }
+
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook nonce: ' . $webhookNonce);
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook V1: ' . $webhookV1);
+        }
+        
+        if ($webhookNonce === null || $webhookV1 === null) {
+            if ($this->debug_mode) {
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook signatures not found');
+            }
+            return false;
+        }
+        
+        
+        $requestBody = file_get_contents('php://input');
+        $payment = json_decode($requestBody, true);
+
+        if (!$this->verify_signature_v1($payment, $webhookV1, $webhookNonce)) {
+            if ($this->debug_mode) {
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook signature mismatch');
+            }
+            return false;
+        }
+
         if ($this->sandbox === 'yes') {
             return in_array(
                 $source,
@@ -1078,5 +1185,90 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if ($authorizationType === 'none') return;
 
         echo '<h4>Maya Payment Processing Notice</h4><em>On capture completion of the total amount, expect delays on payment processing. Refresh page to check if payments have been processed and order status has been updated.</em>';
+    }
+    
+    function flatten_object_to_string($obj, $prefix = '', &$data = []) {
+        if (!is_array($obj)) {
+            throw new InvalidArgumentException('Input must be an array');
+        }
+
+        foreach ($obj as $key => $value) {
+            $fullKey = $prefix ? $prefix . '.' . $key : $key;
+
+            if (
+                $value === null ||
+                $value === '' ||
+                $value === [] ||
+                (is_array($value) && empty($value)) ||
+                (is_object($value) && empty((array) $value))
+            ) {
+                continue;
+            }
+
+            if (is_array($value) || is_object($value)) {
+                $this->flatten_object_to_string((array) $value, $fullKey, $data);
+                continue;
+            }
+
+            if (is_bool($value)) {
+                $data[] = $fullKey . '=' . ($value ? 'true' : 'false');
+            } else {
+                $data[] = $fullKey . '=' . (string) $value;
+            }
+        }
+
+        return $data;
+    }
+    
+
+    function array_some($data, $callback) {
+        $result = array_filter($data, $callback);
+        return count($result) > 0;
+    }
+
+    function verify_signature_v1($payload, $signature, $nonce) {
+        $flatString = $this->flatten_object_to_string($payload);
+        asort($flatString);
+        $concatenatedFlatString = implode('&', $flatString);
+        
+        $verifyString = "{$concatenatedFlatString}&nonce={$nonce}";
+
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Flattened Payload: '. $verifyString);
+        }
+        
+        if ($this->sandbox === 'yes') {
+            if ($this->debug_mode) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Using sandbox public keys');
+            }
+            $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX;
+        } else {
+            if ($this->debug_mode) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Using production public keys');
+            }
+            $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION;
+        }
+
+        return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $signature) {
+            return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption");
+        });
+    }
+    
+    function verify_timestamp($timestamp) {
+        define('TIMESTAMP_TOLERANCE_MS', 5 * 60 * 1000);
+        
+        $currentTime = floor(microtime(true) * 1000);
+        $timeDifference = abs((int) $currentTime - (int) $timestamp);
+
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Time Difference: '. $timeDifference);
+        }
+            
+        if ($timeDifference > TIMESTAMP_TOLERANCE_MS) {
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook timestamp outside tolerance window (diff: ' . $timeDifference . 'ms, max: ' . TIMESTAMP_TOLERANCE_MS . 'ms)');
+            return false;
+        }
+        
+        return true;
     }
 }
