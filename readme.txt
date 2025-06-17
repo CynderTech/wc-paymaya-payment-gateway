@@ -54,8 +54,8 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 = 1.3.0 =
 *Release Date - June 17, 2025*
 
-* Additional increased security checks
-* Cart items now displayed on Maya gateway
+* Enhanced validation of web-hooks
+* Improved cart item breakdown on Checkout page
 * Tested compatibility for WP 6.7.2 and WC 9.9.4
 
 = 1.2.0 =
