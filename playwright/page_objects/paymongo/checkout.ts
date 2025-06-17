@@ -60,13 +60,30 @@ type PaymentMethods = keyof typeof PAYMENT_METHODS;
 class CheckoutPage extends PageObject {
     async fillForm() {
         await this.page.goto('/checkout/');
-        await this.page.getByRole('textbox', { name: 'First name *' }).first().fill(process.env.WP_FNAME || 'Sample');
-        await this.page.getByRole('textbox', { name: 'Last name *' }).first().fill(process.env.WP_LNAME || 'Sample');
-        await this.page.getByRole('textbox', { name: 'Street address *' }).first().fill(process.env.STREET_ADDRESS || 'Sample');
-        await this.page.getByRole('textbox', { name: 'Town / City *' }).first().fill(process.env.CITY || 'Sample');
-        await this.page.getByRole('textbox', { name: 'Postcode / ZIP *' }).first().fill(process.env.ZIP || '1111');
-        await this.page.getByLabel('Phone *').fill(process.env.PNUMBER || '999999999');
-        await this.page.getByLabel('Email address *').fill(process.env.WP_EMAIL || 'sample@test.com');
+        await this.page
+			.getByRole('textbox', { name: /First name/i })
+			.first()
+			.fill(process.env.WP_FNAME || 'Sample');
+		await this.page
+			.getByRole('textbox', { name: /Last name/i })
+			.first()
+			.fill(process.env.WP_LNAME || 'Sample');
+		await this.page
+			.getByRole('textbox', { name: /Street address/i })
+			.first()
+			.fill(process.env.STREET_ADDRESS || 'Sample');
+		await this.page
+			.getByRole('textbox', { name: /Town \/ City/i })
+			.first()
+			.fill(process.env.CITY || 'Sample');
+		await this.page
+			.getByRole('textbox', { name: /Postcode \/ ZIP/i })
+			.first()
+			.fill(process.env.ZIP || '1111');
+		await this.page.getByLabel(/Phone/i).fill(process.env.PNUMBER || '999999999');
+		await this.page
+			.getByLabel(/Email address/i)
+			.fill(process.env.WP_EMAIL || 'sample@test.com');
     }
 
     async selectPaymentMethod(paymentMethod: PaymentMethods, cardPayment?: CardPaymentType) {
@@ -83,24 +100,26 @@ class CheckoutPage extends PageObject {
                 let expDateSelector = '';
                 let cvvSelector = '';
 
-                if(paymentMethod == 'creditCard') {
-                    ccNoSelector = '#paymongo_ccNo';
-                    expDateSelector = '#paymongo_expdate';
-                    cvvSelector = '#paymongo_cvv';
-                } else if (paymentMethod == 'ccInstallment') {
-                    ccNoSelector = '#paymongo_cc_installment_ccNo';
-                    expDateSelector = '#paymongo_cc_installment_expdate';
-                    cvvSelector = '#paymongo_cc_installment_cvv';
-                } else {
-                    throw new Error('Only include a second argument when using the creditCard or ccInstallment payment method');
-                }
+                if (paymentMethod === 'creditCard') {
+					ccNoSelector = '#paymongo_ccNo';
+					expDateSelector = '#paymongo_expdate';
+					cvvSelector = '#paymongo_cvv';
+				} else if (paymentMethod === 'ccInstallment') {
+					ccNoSelector = '#paymongo_cc_installment_ccNo';
+					expDateSelector = '#paymongo_cc_installment_expdate';
+					cvvSelector = '#paymongo_cc_installment_cvv';
+				} else {
+					throw new Error(
+						'Only include a second argument when using the creditCard or ccInstallment payment method',
+					);
+				}
 
                 await this.page.waitForSelector('.paymongo-loading', { state: 'detached' });
 
                 const year = (new Date).getFullYear().toString().slice(2);
 
                 await this.page.locator(ccNoSelector).type(CARD_PAYMENT_TYPE[cardPayment]);
-                await this.page.locator(expDateSelector).type('12' + year);
+                await this.page.locator(expDateSelector).type(`12${year}`);
                 await this.page.locator(cvvSelector).type('111');
             }
         }

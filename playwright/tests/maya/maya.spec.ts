@@ -8,18 +8,35 @@ let shopPage: ShopPage;
 let cartPage: CartPage;
 let checkoutPage: CheckoutPage;
 let hostedCheckoutPage: HostedCheckoutPage;
+let item: string | null;
 
 test.beforeEach(async ({ page }) => {
-    shopPage = new ShopPage(page);
-    cartPage = new CartPage(page);
-    checkoutPage = new CheckoutPage(page);
-    hostedCheckoutPage = new HostedCheckoutPage(page);
+	shopPage = new ShopPage(page);
+	cartPage = new CartPage(page);
+	checkoutPage = new CheckoutPage(page);
+	hostedCheckoutPage = new HostedCheckoutPage(page);
 
-    await shopPage.addToCart();
-    await cartPage.proceedToCheckout();
-    await checkoutPage.fillForm();
-    await checkoutPage.selectPaymentMethod('maya');
-    await checkoutPage.placeOrder();
+	item = await shopPage.addToCart();
+	await cartPage.proceedToCheckout();
+	await checkoutPage.fillForm();
+	await checkoutPage.selectPaymentMethod('maya');
+	await checkoutPage.placeOrder();
+});
+
+test.describe('general', () => {
+	test('the list should show up', async ({ page }) => {
+		let itemRegex: RegExp | string;
+		if (typeof item === 'string') {
+			itemRegex = new RegExp(item, 'i');
+		} else {
+			itemRegex = '';
+		}
+
+		console.log(itemRegex);
+		await hostedCheckoutPage.selectCard('VISA_3DS_FAIL_EXPIRED');
+		await expect(page.getByText(/Order Summary/i)).toBeVisible();
+		await expect(page.getByText(itemRegex)).toBeVisible();
+	});
 });
 
 test.describe('visa', () => {
