@@ -3,7 +3,7 @@ Tags: payments, credit card
 Requires at least: 5.3
 Tested up to: 6.8.2
 Requires PHP: 5.6
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -50,6 +50,11 @@ To test payments, enable **Sandbox Mode**. This will let you transact test payme
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= 1.3.2 =
+*Release Date - September 12, 2025*
+
+* Fix issue with plugin headers
 
 = 1.3.1 =
 *Release Date - September 11, 2025*
