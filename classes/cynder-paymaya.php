@@ -817,13 +817,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function is_valid_source($source) {
-        $webhookTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
+        $webhookTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') !== null ? getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') : $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'];
         if (!$this->verify_timestamp($webhookTimestamp)) {
             /** Exit early if validation fails */
             return false;
         }
 
-        $webhookSignature = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE');
+        $webhookSignature = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE') !== null ? getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE') : $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'];
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Signature ' . $webhookSignature);
         }
