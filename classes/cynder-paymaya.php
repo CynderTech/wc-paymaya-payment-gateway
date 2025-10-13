@@ -818,6 +818,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function is_valid_source($source) {
         $webhookTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') !== false ? getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') : $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'];
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Timestamp ' . $webhookTimestamp);
+        }
+
         if (!$this->verify_timestamp($webhookTimestamp)) {
             /** Exit early if validation fails */
             return false;
@@ -1258,6 +1262,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         define('TIMESTAMP_TOLERANCE_MS', 5 * 60 * 1000);
         
         $currentTime = floor(microtime(true) * 1000);
+
+        if ($this->debug_mode) {
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Timestamp: '. $timestamp);
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Current Time: '. $currentTime);
+        }
+
         $timeDifference = abs((int) $currentTime - (int) $timestamp);
 
         if ($this->debug_mode) {
