@@ -274,10 +274,18 @@ function cynder_paymaya_require_shipping_address2_checkout_field($fields) {
 add_filter('woocommerce_checkout_fields', 'cynder_paymaya_require_shipping_address2_checkout_field');
 
 function update_paymaya_plugin() {
-    $mainPluginSettings = get_option('woocommerce_paymaya_settings');
+    $mainPluginSettings = get_option('woocommerce_paymaya_settings', array());
+
+    // Abort early if settings are uninitialized
+    if (empty($mainPluginSettings) || !isset($mainPluginSettings['public_key']) || !isset($mainPluginSettings['secret_key'])) {
+        wc_get_logger()->log('info', '[Update Maya Plugin] Settings uninitialized. Skipping webhook update.');
+        return;
+    }
+
+    $isSandbox = isset($mainPluginSettings['sandbox']) && $mainPluginSettings['sandbox'] === 'yes';
 
     $client = new Cynder_PaymayaClient(
-        $mainPluginSettings['sandbox'] === 'yes',
+        $isSandbox,
         $mainPluginSettings['public_key'],
         $mainPluginSettings['secret_key'],
     );
