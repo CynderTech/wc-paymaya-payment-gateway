@@ -89,6 +89,7 @@ function cynder_paymaya_scripts($hook) {
         'order_id' => $orderId,
         'amount_authorized' => intval($authorizedOrCapturedPayment['amount']),
         'amount_captured' => intval($authorizedOrCapturedPayment['capturedAmount']),
+        'nonce' => wp_create_nonce('cynder_paymaya_capture_nonce'),
     );
 
     wp_register_script(
@@ -107,6 +108,14 @@ add_action(
 );
 
 function cynder_paymaya_capture_payment() {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cynder_paymaya_capture_nonce')) {
+        return wp_send_json(array('error' => 'Invalid security token'), 403);
+    }
+
+    if (!current_user_can('edit_shop_orders')) {
+        return wp_send_json(array('error' => 'Permission denied'), 403);
+    }
+
     $captureAmount = isset($_POST['capture_amount']) ? sanitize_text_field($_POST['capture_amount']) : null;
     $orderId = isset($_POST['order_id']) ? sanitize_key($_POST['order_id']) : null;
 
