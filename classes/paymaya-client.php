@@ -90,7 +90,7 @@ class Cynder_PaymayaClient {
             'headers' => $this->getHeaders()
         );
 
-        $response = wp_remote_post($this->getBaseUrl() . '/checkout/v1/webhooks/' . $id, $requestArgs);
+        $response = wp_remote_request($this->getBaseUrl() . '/checkout/v1/webhooks/' . $id, $requestArgs);
 
         return $this->handleResponse($response);
     }
