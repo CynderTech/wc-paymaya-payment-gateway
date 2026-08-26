@@ -25,7 +25,7 @@ function cynder_paymaya_scripts($hook) {
     /** If gateway isn't enabled, don't load JS scripts */
     if ($paymentGatewayEnabled !== 'yes') return;
 
-    $orderId = sanitize_key($_GET['post']);
+    $orderId = isset($_GET['post']) ? sanitize_key($_GET['post']) : null;
     $order = wc_get_order($orderId);
 
     if (empty($order)) return;
@@ -111,7 +111,7 @@ add_action(
 
 function cynder_paymaya_capture_payment() {
     $captureAmount = isset($_POST['capture_amount']) ? sanitize_text_field($_POST['capture_amount']) : null;
-    $orderId = sanitize_key($_POST['order_id']) ?? null;
+    $orderId = isset($_POST['order_id']) ? sanitize_key($_POST['order_id']) : null;
 
     if (!isset($captureAmount)) {
         return wp_send_json(
@@ -234,7 +234,7 @@ function cynder_paymaya_catch_redirect() {
         wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] Redirect Params ' . wc_print_r($_GET, true));
     }
 
-    $orderId = sanitize_key($_GET['order']);
+    $orderId = isset($_GET['order']) ? sanitize_key($_GET['order']) : null;
 
     if (!isset($orderId)) {
         /** Check order ID */
@@ -245,7 +245,7 @@ function cynder_paymaya_catch_redirect() {
 
     $order = wc_get_order($orderId);
 
-    $status = sanitize_text_field($_GET['status']);
+    $status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 
     if ($status === 'success') {
         wp_redirect($order->get_checkout_order_received_url());
