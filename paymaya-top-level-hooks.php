@@ -110,8 +110,8 @@ add_action(
 );
 
 function cynder_paymaya_capture_payment() {
-    $captureAmount = sanitize_text_field($_POST['capture_amount']);
-    $orderId = sanitize_key($_POST['order_id']);
+    $captureAmount = isset($_POST['capture_amount']) ? sanitize_text_field($_POST['capture_amount']) : null;
+    $orderId = sanitize_key($_POST['order_id']) ?? null;
 
     if (!isset($captureAmount)) {
         return wp_send_json(

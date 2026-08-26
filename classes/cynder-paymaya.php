@@ -817,16 +817,29 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function get_source() {
-        if (getenv('HTTP_CF_CONNECTING_IP')) return getenv('HTTP_CF_CONNECTING_IP');
-        if (getenv('HTTP_X_FORWARDED_FOR')) return getenv('HTTP_X_FORWARDED_FOR');
-        if (getenv('HTTP_X_FORWARDED_BY')) return getenv('HTTP_X_FORWARDED_BY');
-        if (getenv('HTTP_X_CLIENT_IP')) return getenv('HTTP_X_CLIENT_IP');
-        if (getenv('HTTP_CLIENT_IP')) return getenv('HTTP_CLIENT_IP');
-        if (getenv('REMOTE_ADDR')) return getenv('REMOTE_ADDR');
+        $ip = '';
+        
+        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) $ip = $_SERVER['HTTP_CF_CONNECTING_IP'];
+        elseif (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        elseif (isset($_SERVER['HTTP_X_FORWARDED_BY'])) $ip = $_SERVER['HTTP_X_FORWARDED_BY'];
+        elseif (isset($_SERVER['HTTP_X_CLIENT_IP'])) $ip = $_SERVER['HTTP_X_CLIENT_IP'];
+        elseif (isset($_SERVER['HTTP_CLIENT_IP'])) $ip = $_SERVER['HTTP_CLIENT_IP'];
+        elseif (isset($_SERVER['REMOTE_ADDR'])) $ip = $_SERVER['REMOTE_ADDR'];
+
+        // If multiple IPs are chained (like via ngrok), grab the first one (the original sender)
+        if (strpos($ip, ',') !== false) {
+            $ips = explode(',', $ip);
+            $ip = trim($ips[0]);
+        }
+
+        return $ip;
     }
 
     function is_valid_source($source) {
-        $webhookTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') !== false ? getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') : $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'];
+        $serverTimestamp = $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'] ?? null;
+        $envTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
+
+        $webhookTimestamp = $serverTimestamp ?? ($envTimestamp !== false ? $envTimestamp : '');
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Timestamp ' . $webhookTimestamp);
         }
@@ -836,7 +849,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return false;
         }
 
-        $webhookSignature = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE') !== false ? getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE') : $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'];
+        $serverSig = $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'] ?? null;
+        $envSig = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE');
+
+        $webhookSignature = $serverSig ?? ($envSig !== false ? $envSig : '');
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Signature ' . $webhookSignature);
         }
@@ -898,7 +914,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function handle_payment_webhook_request() {
         $isPostRequest = $_SERVER['REQUEST_METHOD'] === 'POST';
-        $wcApiQuery = sanitize_text_field($_GET['wc-api']);
+        $wcApiQuery = isset($_GET['wc-api']) ? sanitize_text_field($_GET['wc-api']) : null;
         $hasWcApiQuery = isset($wcApiQuery);
         $hasCorrectQuery = $wcApiQuery === 'cynder_paymaya_payment';
         $source = $this->get_source();
