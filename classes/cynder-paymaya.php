@@ -836,7 +836,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function is_valid_source($source) {
-        $serverTimestamp = $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'] ?? null;
+        $serverTimestamp = $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'] ?? '';
         $envTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
 
         $webhookTimestamp = $serverTimestamp ?? ($envTimestamp !== false ? $envTimestamp : '');
@@ -849,7 +849,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return false;
         }
 
-        $serverSig = $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'] ?? null;
+        $serverSig = $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'] ?? '';
         $envSig = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE');
 
         $webhookSignature = $serverSig ?? ($envSig !== false ? $envSig : '');
