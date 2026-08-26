@@ -542,16 +542,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] Payments via RRN ' . wc_print_r($payments, true));
         }
 
-        $orderMetadata = $order->get_meta_data();
-
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Authorization Metadata ' . wc_print_r($authorizationTypeMetadata, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Authorization Type: ' . $authorizationType);
         }
 
-        if ($authorizationTypeMetadata->value === 'none') {
+        if (empty($authorizationType) || $authorizationType === 'none') {
             $successfulPayments = array_values(
                 array_filter(
                     $payments,
@@ -953,20 +950,17 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             die();
         }
 
-        $orderMetadata = $order->get_meta_data();
-
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Authorization metadata ' . wc_print_r($authorizationTypeMetadata, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Authorization Type: ' . $authorizationType);
         }
 
         $transactionRefNumber = $payment['id'];
         $status = $payment['status'];
         $amountPaid = $payment['amount'];
 
-        if ($authorizationTypeMetadata->value === 'none') {
+        if (empty($authorizationType) || $authorizationType === 'none') {
             /** For non-manual capture payments: */
 
             if ($order->is_paid()) {
@@ -1112,16 +1106,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             }
         }
 
-        $orderMetadata = $order->get_meta_data();
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorization metadata ' . wc_print_r($orderMetadata, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorization Type: ' . $authorizationType);
         }
 
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
-
-        if ($authorizationTypeMetadata->value === 'none') return;
+        if (empty($authorizationType) || $authorizationType === 'none') return;
 
         $authorizedPayments = array_values(
             array_filter(
@@ -1148,13 +1139,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     function wc_captured_payments($orderId) {
         $order = wc_get_order($orderId);
 
-        $orderMetadata = $order->get_meta_data();
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
-        $authorizationType = $authorizationTypeMetadata->value;
-
-        if ($authorizationType === 'none') return;
+        if (empty($authorizationType) || $authorizationType === 'none') return;
 
         $payments = $this->client->getPaymentViaRrn($orderId);
 
@@ -1202,16 +1189,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function wc_paymaya_webhook_labels($order) {
-        $orderMetadata = $order->get_meta_data();
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-
-        if (!$authorizationTypeMetadataIndex) return;
-
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
-        $authorizationType = $authorizationTypeMetadata->value;
-
-        if ($authorizationType === 'none') return;
+        if (empty($authorizationType) || $authorizationType === 'none') return;
 
         echo '<h4>Maya Payment Processing Notice</h4><em>On capture completion of the total amount, expect delays on payment processing. Refresh page to check if payments have been processed and order status has been updated.</em>';
     }

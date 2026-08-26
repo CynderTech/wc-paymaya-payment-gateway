@@ -31,13 +31,10 @@ function cynder_paymaya_scripts($hook) {
     if (empty($order)) return;
     if (!method_exists($order, 'get_meta_data')) return;
 
-    $orderMetadata = $order->get_meta_data();
-
-    $authorizationTypeMetadataIndex = array_search($paymentGatewaId . '_authorization_type', array_column($orderMetadata, 'key'));
-    $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
+    $authorizationType = $order->get_meta($paymentGatewaId . '_authorization_type');
 
     /** If order isn't made with manual capture, don't load JS scripts */
-    if ($authorizationTypeMetadata->value === 'none') return;
+    if (empty($authorizationType) || $authorizationType === 'none') return;
 
     $isSandbox = $paymayaGateway->get_option('sandbox');
     $secretKey = $paymayaGateway->get_option('secret_key');
