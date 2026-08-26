@@ -199,8 +199,6 @@ function Paymaya_Init_Gateway_class()
                     'wc-paymaya-payment-gateway'
                 );
 
-                $sections = [];
-
                 return $sections;
             }
 
