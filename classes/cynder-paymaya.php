@@ -98,6 +98,15 @@ define('MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION', array(
  */
 class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 {
+    public $manual_capture;
+    public $sandbox;
+    public $secret_key;
+    public $public_key;
+    public $webhook_success;
+    public $webhook_failure;
+    public $debug_mode;
+    public $client;
+
     /**
      * Singleton instance
      * 

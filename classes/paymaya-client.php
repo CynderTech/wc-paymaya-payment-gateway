@@ -9,6 +9,10 @@
  * WordPress' wp_remote functions
  */
 class Cynder_PaymayaClient {
+    public $isSandbox;
+    public $public_key;
+    public $secret_key;
+
     public function __construct($isSandbox, $publicKey, $secretKey) {
         $this->isSandbox = $isSandbox;
         $this->public_key = $publicKey;
