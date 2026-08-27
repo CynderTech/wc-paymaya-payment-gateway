@@ -298,7 +298,7 @@ function update_paymaya_plugin() {
     $mainPluginSettings = get_option('woocommerce_paymaya_settings', array());
 
     // Abort early if settings are uninitialized
-    if (empty($mainPluginSettings) || !isset($mainPluginSettings['public_key']) || !isset($mainPluginSettings['secret_key'])) {
+    if (empty($mainPluginSettings['public_key']) || empty($mainPluginSettings['secret_key'])) {
         wc_get_logger()->log('info', '[Update Maya Plugin] Settings uninitialized. Skipping webhook update.');
         return;
     }
@@ -308,7 +308,7 @@ function update_paymaya_plugin() {
     $client = new Cynder_PaymayaClient(
         $isSandbox,
         $mainPluginSettings['public_key'],
-        $mainPluginSettings['secret_key'],
+        $mainPluginSettings['secret_key']
     );
 
     $webhooks = $client->retrieveWebhooks();
