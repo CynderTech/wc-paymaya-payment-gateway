@@ -841,7 +841,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $serverTimestamp = $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'] ?? '';
         $envTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
 
-        $webhookTimestamp = $serverTimestamp ?? ($envTimestamp !== false ? $envTimestamp : '');
+        $webhookTimestamp = !empty($serverTimestamp) ? $serverTimestamp : ($envTimestamp !== false ? $envTimestamp : '');
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Timestamp ' . $webhookTimestamp);
         }
@@ -854,7 +854,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $serverSig = $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'] ?? '';
         $envSig = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE');
 
-        $webhookSignature = $serverSig ?? ($envSig !== false ? $envSig : '');
+        $webhookSignature = !empty($serverSig) ? $serverSig : ($envSig !== false ? $envSig : '');
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Signature ' . $webhookSignature);
         }
