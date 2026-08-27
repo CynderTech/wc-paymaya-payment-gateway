@@ -108,27 +108,6 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     public $client;
 
     const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
-        
-    /**
-     * Singleton instance
-     * 
-     * @var Singleton The reference the *Singleton* instance of this class
-     */
-    private static $_instance;
-
-    /**
-     * Returns the *Singleton* instance of this class.
-     *
-     * @return Singleton The *Singleton* instance.
-     */
-    public static function getInstance()
-    {
-        if (null === self::$_instance ) {
-            self::$_instance = new self();
-        }
-
-        return self::$_instance;
-    }
 
     /**
      * Starting point of the payment gateway
