@@ -673,7 +673,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 );
 
                 $sorted = usort($capturedPayments, function ($a, $b) {
-                    return strtotime($a['createdAt']) - strtotime($b['createdAt']);
+                    return strtotime($a['createdAt']) <=> strtotime($b['createdAt']);
                 });
 
                 if (!$sorted) {

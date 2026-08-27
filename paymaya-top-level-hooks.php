@@ -87,8 +87,8 @@ function cynder_paymaya_scripts($hook) {
 
     $jsVar = array(
         'order_id' => $orderId,
-        'amount_authorized' => intval($authorizedOrCapturedPayment['amount']),
-        'amount_captured' => intval($authorizedOrCapturedPayment['capturedAmount']),
+        'amount_authorized' => floatval($authorizedOrCapturedPayment['amount']),
+        'amount_captured' => floatval($authorizedOrCapturedPayment['capturedAmount']),
         'nonce' => wp_create_nonce('cynder_paymaya_capture_nonce'),
     );
 
@@ -304,6 +304,7 @@ function update_paymaya_plugin() {
 
     if (array_key_exists("error", $webhooks)) {
         wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error retrieving webhooks ' . wc_print_r($webhooks['error'], true));
+        return;
     }
 
     foreach($webhooks as $webhook) {
