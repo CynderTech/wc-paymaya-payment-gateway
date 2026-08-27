@@ -377,16 +377,20 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $shippingCountry   = $this->get_address_fallback($order, 'country');
 
         foreach ($order->get_items() as $orderItem) {
+            // Use standard WooCommerce methods to safely get the unit price and line total
+            $item_unit_price = $order->get_item_total($orderItem, false, false);
+            $item_line_total = $order->get_line_total($orderItem, false, false);
+
             array_push($orderItemArray, array(
                 "name" => $orderItem->get_name(),
                 "description" => $orderItem->get_name(),
                 "quantity" => $orderItem->get_quantity(),
                 "code" => '001',
                 "amount" => array(
-                    "value" => floatval($orderItem->get_total())
+                    "value" => floatval($item_unit_price)
                 ),
                 "totalAmount" => array(
-                    "value" => floatval($orderItem->get_total())
+                    "value" => floatval($item_line_total)
                 )
             ));
         }
