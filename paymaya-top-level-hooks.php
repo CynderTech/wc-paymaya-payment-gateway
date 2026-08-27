@@ -258,7 +258,7 @@ function cynder_paymaya_catch_redirect() {
         /** Check order ID */
         wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] No order found with ID ' . $orderId);
         wc_add_notice('Something went wrong, please contact Maya support.', 'error');
-        wp_redirect(get_home_url());
+        wp_safe_redirect(get_home_url());
     }
 
     $order = wc_get_order($orderId);
@@ -266,10 +266,10 @@ function cynder_paymaya_catch_redirect() {
     $status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 
     if ($status === 'success') {
-        wp_redirect($order->get_checkout_order_received_url());
+        wp_safe_redirect($order->get_checkout_order_received_url());
     } else if ($status === 'failed') {
         wc_add_notice('Payment failed. Please try again or try another payment method.', 'error');
-        wp_redirect($order->get_checkout_payment_url());
+        wp_safe_redirect($order->get_checkout_payment_url());
     }
 }
 
