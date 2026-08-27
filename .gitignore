@@ -1,3 +1,5 @@
 .vscode
 .svn
 svnignore.txt
+
+vendor/

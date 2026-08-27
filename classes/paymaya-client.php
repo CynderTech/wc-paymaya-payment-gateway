@@ -1,5 +1,9 @@
 <?php
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 /**
  * Paymaya Client Class
  * 
@@ -9,6 +13,10 @@
  * WordPress' wp_remote functions
  */
 class Cynder_PaymayaClient {
+    public $isSandbox;
+    public $public_key;
+    public $secret_key;
+
     public function __construct($isSandbox, $publicKey, $secretKey) {
         $this->isSandbox = $isSandbox;
         $this->public_key = $publicKey;
@@ -86,7 +94,7 @@ class Cynder_PaymayaClient {
             'headers' => $this->getHeaders()
         );
 
-        $response = wp_remote_post($this->getBaseUrl() . '/checkout/v1/webhooks/' . $id, $requestArgs);
+        $response = wp_remote_request($this->getBaseUrl() . '/checkout/v1/webhooks/' . $id, $requestArgs);
 
         return $this->handleResponse($response);
     }

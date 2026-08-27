@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-$fileDir = dirname(__FILE__);
+$fileDir = plugin_dir_path( __FILE__ );
 include_once $fileDir.'/paymaya-client.php';
 
 /** Error identifiers */
@@ -38,53 +38,45 @@ define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array(
 ));
 
 define('MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX', array(
-    <<<EOD
-    -----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjNkSX6p+goDPaPAYuTzT
-    zKTCBeLhh8FkPMbZxDKTUxF93dOwiC7jsdx7KyopupeLosiVlbs+gpAJ7XBQP/Ex
-    giyzXC9TljpyvkUQfyRPMAMKq+BzxdUliTl6hgrLBsH28CP5FuPHCsfxDXe7mDtv
-    9H4mP3SKO0HfkZ45tudxD9CWbwWKF0lU9LRbLlJ0y7KEaK7Rv9fI1Dp/KPT+9pls
-    tU+CPNKaxJjGRKGuxW2AOCabSD0cTZNXki+K51mNoma7Mj1HMhnsR68FGJvCqk1q
-    Wsr3q8+EUMVPBMX+5nKATfZYGvxg4ytzT8pnEVeWl6phYKviB9aVVwurh1gDJB4r
-    lQIDAQAB
-    -----END PUBLIC KEY-----
-    EOD,
-    <<<EOD
-    -----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp14gezqq4dGWu7EZ7BHx
-    8wD3y1hqxwQR7UYPXtXJP+WngN4wqwatjsnQaRGnmdPRG8VEzUzw9PlR7t7P24uW
-    +J08xBrtTVouD2MKglcIcy13rt1XL79zr/LIAFMFI6f4O8/OQi1xsGsZ6xarD+wl
-    OQKG4W66I3yp2jNAbge25eSPuo0BNqPWvebMcIYJu4f3Fxu1eDgeM6zCEqLc6+jX
-    cNTP/zFHCvQaiIlLOqfgXDRPBcHPPZ2qcB99UVPAHXBKsKdtBB2w2qT2l99MlTAB
-    iRy+IKtVQcQyRP7T8blegO25x35G2CZ3VCKPkmUen3eXQ4+r5fVlzEIBSfNvBwT9
-    jQIDAQAB
-    -----END PUBLIC KEY-----
-    EOD
+    "-----BEGIN PUBLIC KEY-----\n" .
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjNkSX6p+goDPaPAYuTzT\n" .
+    "zKTCBeLhh8FkPMbZxDKTUxF93dOwiC7jsdx7KyopupeLosiVlbs+gpAJ7XBQP/Ex\n" .
+    "giyzXC9TljpyvkUQfyRPMAMKq+BzxdUliTl6hgrLBsH28CP5FuPHCsfxDXe7mDtv\n" .
+    "9H4mP3SKO0HfkZ45tudxD9CWbwWKF0lU9LRbLlJ0y7KEaK7Rv9fI1Dp/KPT+9pls\n" .
+    "tU+CPNKaxJjGRKGuxW2AOCabSD0cTZNXki+K51mNoma7Mj1HMhnsR68FGJvCqk1q\n" .
+    "Wsr3q8+EUMVPBMX+5nKATfZYGvxg4ytzT8pnEVeWl6phYKviB9aVVwurh1gDJB4r\n" .
+    "lQIDAQAB\n" .
+    "-----END PUBLIC KEY-----",
+    "-----BEGIN PUBLIC KEY-----\n" .
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp14gezqq4dGWu7EZ7BHx\n" .
+    "8wD3y1hqxwQR7UYPXtXJP+WngN4wqwatjsnQaRGnmdPRG8VEzUzw9PlR7t7P24uW\n" .
+    "+J08xBrtTVouD2MKglcIcy13rt1XL79zr/LIAFMFI6f4O8/OQi1xsGsZ6xarD+wl\n" .
+    "OQKG4W66I3yp2jNAbge25eSPuo0BNqPWvebMcIYJu4f3Fxu1eDgeM6zCEqLc6+jX\n" .
+    "cNTP/zFHCvQaiIlLOqfgXDRPBcHPPZ2qcB99UVPAHXBKsKdtBB2w2qT2l99MlTAB\n" .
+    "iRy+IKtVQcQyRP7T8blegO25x35G2CZ3VCKPkmUen3eXQ4+r5fVlzEIBSfNvBwT9\n" .
+    "jQIDAQAB\n" .
+    "-----END PUBLIC KEY-----",
 ));
 
 define('MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION', array(
-    <<<EOD
-    -----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjCGhkjg1PQe0WVHCYdTT
-    2luqzXhKfeStALWlEcMpHqYusd6dAU4vZ9bGQns/OYe/H2cIxEPvRJnRcipMKvVZ
-    pzAFEKHQLiXdeuNcxkAaxEZEwMAmFdVGmNLZbpi579r2s6Q++zYy0OHb9awY/2z0
-    OYRwV5XN7SCrqIlf1tEHfxKV2cJDCFW030nnRMoWisQ9KXG3Ihvjj4tOQimPCtzp
-    SDtlf6QFmg/WZBIOEdLro9oROztK6PwrI/yG5ZFaUCQYfY8fw0y1/PI3heEf8z5k
-    xA466LdSqCeVdGwfjKy9ZHown8XiiPI82HnBrMP3UPX4efEfopbP4SpDFOEwRNA9
-    FQIDAQAB
-    -----END PUBLIC KEY-----
-    EOD,
-    <<<EOD
-    -----BEGIN PUBLIC KEY-----
-    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxZJxNmpNYjxFCBa2P6Ad
-    wzDDuDKOKAgiTBrQvJGuX/l2u32N4d4FYw99md16rf1iIcxD70/KG9nWrltrxbIs
-    bm9+bCHVLKMfdjaJQCBGXN/WW6W1XaGQQPft9UlmAwA/uMKTsN/2XqFjoKSJoe9e
-    Xz/p3pGn66oBTCwvzDqma46GxF92atiOt6CEcRl8P+dDKJlYY7fcxiuNMeDMOOla
-    KMxUz9nMgJ6uESK/kS8C8+hGuiCWgKeIRm/ONL5Gk/lypWzrphaKcWqpBGZxpNAL
-    AVmPY9ke4+RxyojkEre4d5sT2C21oAQVHyGewd0ttQ/bK59X17+yg5FOfRpI1BKj
-    7wIDAQAB
-    -----END PUBLIC KEY-----
-    EOD
+    "-----BEGIN PUBLIC KEY-----\n" .
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjCGhkjg1PQe0WVHCYdTT\n" .
+    "2luqzXhKfeStALWlEcMpHqYusd6dAU4vZ9bGQns/OYe/H2cIxEPvRJnRcipMKvVZ\n" .
+    "pzAFEKHQLiXdeuNcxkAaxEZEwMAmFdVGmNLZbpi579r2s6Q++zYy0OHb9awY/2z0\n" .
+    "OYRwV5XN7SCrqIlf1tEHfxKV2cJDCFW030nnRMoWisQ9KXG3Ihvjj4tOQimPCtzp\n" .
+    "SDtlf6QFmg/WZBIOEdLro9oROztK6PwrI/yG5ZFaUCQYfY8fw0y1/PI3heEf8z5k\n" .
+    "xA466LdSqCeVdGwfjKy9ZHown8XiiPI82HnBrMP3UPX4efEfopbP4SpDFOEwRNA9\n" .
+    "FQIDAQAB\n" .
+    "-----END PUBLIC KEY-----",
+    "-----BEGIN PUBLIC KEY-----\n" .
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxZJxNmpNYjxFCBa2P6Ad\n" .
+    "wzDDuDKOKAgiTBrQvJGuX/l2u32N4d4FYw99md16rf1iIcxD70/KG9nWrltrxbIs\n" .
+    "bm9+bCHVLKMfdjaJQCBGXN/WW6W1XaGQQPft9UlmAwA/uMKTsN/2XqFjoKSJoe9e\n" .
+    "Xz/p3pGn66oBTCwvzDqma46GxF92atiOt6CEcRl8P+dDKJlYY7fcxiuNMeDMOOla\n" .
+    "KMxUz9nMgJ6uESK/kS8C8+hGuiCWgKeIRm/ONL5Gk/lypWzrphaKcWqpBGZxpNAL\n" .
+    "AVmPY9ke4+RxyojkEre4d5sT2C21oAQVHyGewd0ttQ/bK59X17+yg5FOfRpI1BKj\n" .
+    "7wIDAQAB\n" .
+    "-----END PUBLIC KEY-----",
 ));
 
 /**
@@ -98,26 +90,15 @@ define('MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION', array(
  */
 class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 {
-    /**
-     * Singleton instance
-     * 
-     * @var Singleton The reference the *Singleton* instance of this class
-     */
-    private static $_instance;
-
-    /**
-     * Returns the *Singleton* instance of this class.
-     *
-     * @return Singleton The *Singleton* instance.
-     */
-    public static function getInstance()
-    {
-        if (null === self::$_instance ) {
-            self::$_instance = new self();
-        }
-
-        return self::$_instance;
-    }
+    public $manual_capture;
+    public $sandbox;
+    public $secret_key;
+    public $public_key;
+    public $webhook_success;
+    public $webhook_failure;
+    public $debug_mode;
+    public $client;
+    private const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
 
     /**
      * Starting point of the payment gateway
@@ -258,17 +239,17 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'webhook_success' => array(
                 'title' => 'Webhook Checkout Success URL',
                 'type' => 'text',
-                'default' => get_home_url() . '?wc-api=cynder_paymaya'
+                'default' => home_url( '/?wc-api=cynder_paymaya' )
             ),
             'webhook_failure' => array(
                 'title' => 'Webhook Checkout Failure URL',
                 'type' => 'text',
-                'default' => get_home_url() . '?wc-api=cynder_paymaya'
+                'default' => home_url( '/?wc-api=cynder_paymaya' )
             ),
             'webhook_payment_status' => array(
                 'title' => 'Webhook Payment Status URL',
                 'type' => 'text',
-                'default' => get_home_url() . '?wc-api=cynder_paymaya_payment'
+                'default' => home_url( '/?wc-api=cynder_paymaya_payment' )
             ),
             'debug_mode' => array(
                 'title' => 'Debug Mode',
@@ -376,55 +357,32 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         
         $orderItemArray = [];
 
-        $catchRedirectUrl = get_home_url() . '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId;
+        $orderKey = $order->get_order_key();
+        $catchRedirectUrl = home_url( '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId . '&key=' . $orderKey );
 
-        $shippingFirstName = $order->get_shipping_first_name();
-        $shippingLastName = $order->get_shipping_last_name();
-        $shippingLine1 = $order->get_shipping_address_1();
-        $shippingLine2 = $order->get_shipping_address_2();
-        $shippingCity = $order->get_shipping_city();
-        $shippingZipCode = $order->get_shipping_postcode();
-        $shippingCountry = $order->get_shipping_country();
-
-        if (empty($shippingCountry)) {
-            $shippingCountry = $order->get_billing_country();
-        }
-
-        if (empty($shippingFirstName)) {
-            $shippingFirstName = $order->get_billing_first_name();
-        }
-
-        if (empty($shippingLastName)) {
-            $shippingLastName = $order->get_billing_last_name();
-        }
-
-        if (empty($shippingLine1)) {
-            $shippingLine1 = $order->get_billing_address_1();
-        }
-
-        if (empty($shippingLine2)) {
-            $shippingLine2 = $order->get_billing_address_2();
-        }
-
-        if (empty($shippingCity)) {
-            $shippingCity = $order->get_billing_city();
-        }
-
-        if (empty($shippingZipCode)) {
-            $shippingZipCode = $order->get_billing_postcode();
-        }
+        $shippingFirstName = $this->get_address_fallback($order, 'first_name');
+        $shippingLastName  = $this->get_address_fallback($order, 'last_name');
+        $shippingLine1     = $this->get_address_fallback($order, 'address_1');
+        $shippingLine2     = $this->get_address_fallback($order, 'address_2');
+        $shippingCity      = $this->get_address_fallback($order, 'city');
+        $shippingZipCode   = $this->get_address_fallback($order, 'postcode');
+        $shippingCountry   = $this->get_address_fallback($order, 'country');
 
         foreach ($order->get_items() as $orderItem) {
+            // Use standard WooCommerce methods to safely get the unit price and line total
+            $item_unit_price = $order->get_item_total($orderItem, false, false);
+            $item_line_total = $order->get_line_total($orderItem, false, false);
+
             array_push($orderItemArray, array(
                 "name" => $orderItem->get_name(),
                 "description" => $orderItem->get_name(),
                 "quantity" => $orderItem->get_quantity(),
                 "code" => '001',
                 "amount" => array(
-                    "value" => floatval($orderItem->get_total())
+                    "value" => floatval($item_unit_price)
                 ),
                 "totalAmount" => array(
-                    "value" => floatval($orderItem->get_total())
+                    "value" => floatval($item_line_total)
                 )
             ));
         }
@@ -455,7 +413,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     "state" => $order->get_shipping_state(),
                     "zipCode" => $shippingZipCode,
                     "countryCode" => $shippingCountry,
-                    "shippingType" => 'ST', // standard shipping is hard-coded for now
+                    "shippingType" => 'ST', // TODO: standard shipping is hard-coded for now
                     "phone" => $order->get_billing_phone(),
                     "email" => $order->get_billing_email()
                 ),
@@ -533,16 +491,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] Payments via RRN ' . wc_print_r($payments, true));
         }
 
-        $orderMetadata = $order->get_meta_data();
-
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Authorization Metadata ' . wc_print_r($authorizationTypeMetadata, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Authorization Type: ' . $authorizationType);
         }
 
-        if ($authorizationTypeMetadata->value === 'none') {
+        if (empty($authorizationType) || $authorizationType === 'none') {
             $successfulPayments = array_values(
                 array_filter(
                     $payments,
@@ -667,9 +622,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 );
 
                 $sorted = usort($capturedPayments, function ($a, $b) {
-                    return strtotime($a['createdAt']) - strtotime($b['createdAt']);
+                    return strtotime($a['createdAt']) <=> strtotime($b['createdAt']);
                 });
 
+                // In PHP 8.2, usort always returns true which will make this check redundant.
                 if (!$sorted) {
                     return new WP_Error(400, 'Something went wrong with refunding the captured payments');
                 }
@@ -724,7 +680,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
                 $actionsToProcess = array();
 
-                do {
+                while ($amountValue > 0 && count($availableActions) > 0) {
                     $availableAction = array_shift($availableActions);
                     $actionType = $availableAction['action'];
                     $actionAmount = floatval($availableAction['amount']);
@@ -748,11 +704,16 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
                         array_push($actionsToProcess, $availableAction);
                     }
-                } while ($amountValue != 0 || count($availableActions) > 0);
+                }
 
                 if ($this->debug_mode) {
                     wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Actions to process ' . wc_print_r($actionsToProcess, true));
                 }
+
+                if ($amountValue > 0) {
+                    return new WP_Error(400, 'Insufficient captured amount to cover the requested refund.');
+                }
+
 
                 return $this->do_mass_refund($actionsToProcess, $reason);
             }
@@ -808,16 +769,29 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function get_source() {
-        if (getenv('HTTP_CF_CONNECTING_IP')) return getenv('HTTP_CF_CONNECTING_IP');
-        if (getenv('HTTP_X_FORWARDED_FOR')) return getenv('HTTP_X_FORWARDED_FOR');
-        if (getenv('HTTP_X_FORWARDED_BY')) return getenv('HTTP_X_FORWARDED_BY');
-        if (getenv('HTTP_X_CLIENT_IP')) return getenv('HTTP_X_CLIENT_IP');
-        if (getenv('HTTP_CLIENT_IP')) return getenv('HTTP_CLIENT_IP');
-        if (getenv('REMOTE_ADDR')) return getenv('REMOTE_ADDR');
+        $ip = '';
+        
+        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) $ip = $_SERVER['HTTP_CF_CONNECTING_IP'];
+        elseif (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        elseif (isset($_SERVER['HTTP_X_FORWARDED_BY'])) $ip = $_SERVER['HTTP_X_FORWARDED_BY'];
+        elseif (isset($_SERVER['HTTP_X_CLIENT_IP'])) $ip = $_SERVER['HTTP_X_CLIENT_IP'];
+        elseif (isset($_SERVER['HTTP_CLIENT_IP'])) $ip = $_SERVER['HTTP_CLIENT_IP'];
+        elseif (isset($_SERVER['REMOTE_ADDR'])) $ip = $_SERVER['REMOTE_ADDR'];
+
+        // If multiple IPs are chained (like via ngrok), grab the first one (the original sender)
+        if (strpos($ip, ',') !== false) {
+            $ips = explode(',', $ip);
+            $ip = trim($ips[0]);
+        }
+
+        return $ip;
     }
 
     function is_valid_source($source) {
-        $webhookTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') !== false ? getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP') : $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'];
+        $serverTimestamp = $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'] ?? '';
+        $envTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
+
+        $webhookTimestamp = !empty($serverTimestamp) ? $serverTimestamp : ($envTimestamp !== false ? $envTimestamp : '');
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Timestamp ' . $webhookTimestamp);
         }
@@ -827,7 +801,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return false;
         }
 
-        $webhookSignature = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE') !== false ? getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE') : $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'];
+        $serverSig = $_SERVER['HTTP_X_MAYA_WEBHOOK_SIGNATURE'] ?? '';
+        $envSig = getenv('HTTP_X_MAYA_WEBHOOK_SIGNATURE');
+
+        $webhookSignature = !empty($serverSig) ? $serverSig : ($envSig !== false ? $envSig : '');
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook Signature ' . $webhookSignature);
         }
@@ -889,7 +866,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function handle_payment_webhook_request() {
         $isPostRequest = $_SERVER['REQUEST_METHOD'] === 'POST';
-        $wcApiQuery = sanitize_text_field($_GET['wc-api']);
+        $wcApiQuery = isset($_GET['wc-api']) ? sanitize_text_field($_GET['wc-api']) : null;
         $hasWcApiQuery = isset($wcApiQuery);
         $hasCorrectQuery = $wcApiQuery === 'cynder_paymaya_payment';
         $source = $this->get_source();
@@ -928,20 +905,17 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             die();
         }
 
-        $orderMetadata = $order->get_meta_data();
-
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Authorization metadata ' . wc_print_r($authorizationTypeMetadata, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Authorization Type: ' . $authorizationType);
         }
 
         $transactionRefNumber = $payment['id'];
         $status = $payment['status'];
         $amountPaid = $payment['amount'];
 
-        if ($authorizationTypeMetadata->value === 'none') {
+        if (empty($authorizationType) || $authorizationType === 'none') {
             /** For non-manual capture payments: */
 
             if ($order->is_paid()) {
@@ -1087,16 +1061,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             }
         }
 
-        $orderMetadata = $order->get_meta_data();
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorization metadata ' . wc_print_r($orderMetadata, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorization Type: ' . $authorizationType);
         }
 
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
-
-        if ($authorizationTypeMetadata->value === 'none') return;
+        if (empty($authorizationType) || $authorizationType === 'none') return;
 
         $authorizedPayments = array_values(
             array_filter(
@@ -1123,13 +1094,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     function wc_captured_payments($orderId) {
         $order = wc_get_order($orderId);
 
-        $orderMetadata = $order->get_meta_data();
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
-        $authorizationType = $authorizationTypeMetadata->value;
-
-        if ($authorizationType === 'none') return;
+        if (empty($authorizationType) || $authorizationType === 'none') return;
 
         $payments = $this->client->getPaymentViaRrn($orderId);
 
@@ -1177,16 +1144,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function wc_paymaya_webhook_labels($order) {
-        $orderMetadata = $order->get_meta_data();
+        $authorizationType = $order->get_meta($this->id . '_authorization_type');
 
-        $authorizationTypeMetadataIndex = array_search($this->id . '_authorization_type', array_column($orderMetadata, 'key'));
-
-        if (!$authorizationTypeMetadataIndex) return;
-
-        $authorizationTypeMetadata = $orderMetadata[$authorizationTypeMetadataIndex];
-        $authorizationType = $authorizationTypeMetadata->value;
-
-        if ($authorizationType === 'none') return;
+        if (empty($authorizationType) || $authorizationType === 'none') return;
 
         echo '<h4>Maya Payment Processing Notice</h4><em>On capture completion of the total amount, expect delays on payment processing. Refresh page to check if payments have been processed and order status has been updated.</em>';
     }
@@ -1232,7 +1192,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function verify_signature_v1($payload, $signature, $nonce) {
         $flatString = $this->flatten_object_to_string($payload);
-        asort($flatString);
+        sort($flatString);
         $concatenatedFlatString = implode('&', $flatString);
         
         $verifyString = "{$concatenatedFlatString}&nonce={$nonce}";
@@ -1254,13 +1214,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         }
 
         return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $signature) {
-            return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption");
+            return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption") === 1;
         });
     }
     
     function verify_timestamp($timestamp) {
-        define('TIMESTAMP_TOLERANCE_MS', 5 * 60 * 1000);
-        
         $currentTime = floor(microtime(true) * 1000);
 
         if ($this->debug_mode) {
@@ -1274,11 +1232,20 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Time Difference: '. $timeDifference);
         }
             
-        if ($timeDifference > TIMESTAMP_TOLERANCE_MS) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook timestamp outside tolerance window (diff: ' . $timeDifference . 'ms, max: ' . TIMESTAMP_TOLERANCE_MS . 'ms)');
+        if ($timeDifference > self::TIMESTAMP_TOLERANCE_MS) {
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook timestamp outside tolerance window (diff: ' . $timeDifference . 'ms, max: ' . self::TIMESTAMP_TOLERANCE_MS . 'ms)');
             return false;
         }
         
         return true;
+    }
+
+    private function get_address_fallback($order, $field_suffix) {
+        $shipping_method = "get_shipping_{$field_suffix}";
+        $billing_method = "get_billing_{$field_suffix}";
+        
+        $value = $order->$shipping_method();
+        
+        return empty($value) ? $order->$billing_method() : $value;
     }
 }

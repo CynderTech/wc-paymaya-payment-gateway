@@ -8,9 +8,10 @@
  * License: GPLv3
  * Version: 1.3.4
  * Requires at least: 5.3
- * Tested up to: 6.8.2
+ * Tested up to: 7.1
+ * Requires PHP: 7.2.5
  * WC requires at least: 3.9.3
- * WC tested up to: 10.1.2
+ * WC tested up to: 11.0.1
  *
  * @category Plugin
  * @package  CynderTech
@@ -148,7 +149,7 @@ function Paymaya_Init_Gateway_class()
              */
             public function init()
             {
-                $fileDir = dirname(__FILE__);
+                $fileDir = plugin_dir_path( __FILE__ );
                 include_once $fileDir.'/classes/cynder-paymaya.php';
                 include_once 'paymaya-top-level-hooks.php';
 
@@ -198,8 +199,6 @@ function Paymaya_Init_Gateway_class()
                     'Payments via Maya',
                     'wc-paymaya-payment-gateway'
                 );
-
-                $sections = [];
 
                 return $sections;
             }
