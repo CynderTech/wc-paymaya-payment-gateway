@@ -148,7 +148,7 @@ function Paymaya_Init_Gateway_class()
              */
             public function init()
             {
-                $fileDir = dirname(__FILE__);
+                $fileDir = plugin_dir_path( __FILE__ );
                 include_once $fileDir.'/classes/cynder-paymaya.php';
                 include_once 'paymaya-top-level-hooks.php';
 

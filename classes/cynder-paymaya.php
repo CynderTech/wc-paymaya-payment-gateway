@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit; // Exit if accessed directly
 }
 
-$fileDir = dirname(__FILE__);
+$fileDir = plugin_dir_path( __FILE__ );
 include_once $fileDir.'/paymaya-client.php';
 
 /** Error identifiers */

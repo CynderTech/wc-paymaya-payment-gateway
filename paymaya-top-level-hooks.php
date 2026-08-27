@@ -4,7 +4,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$fileDir = dirname(__FILE__);
+$fileDir = plugin_dir_path( __FILE__ );
 include_once $fileDir.'/classes/paymaya-client.php';
 
 /** Logger indicators */
