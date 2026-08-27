@@ -106,8 +106,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     public $webhook_failure;
     public $debug_mode;
     public $client;
-
-    const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
+    private const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
 
     /**
      * Starting point of the payment gateway
@@ -1240,8 +1239,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Time Difference: '. $timeDifference);
         }
             
-        if ($timeDifference > TIMESTAMP_TOLERANCE_MS) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook timestamp outside tolerance window (diff: ' . $timeDifference . 'ms, max: ' . TIMESTAMP_TOLERANCE_MS . 'ms)');
+        if ($timeDifference > self::TIMESTAMP_TOLERANCE_MS) {
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook timestamp outside tolerance window (diff: ' . $timeDifference . 'ms, max: ' . self::TIMESTAMP_TOLERANCE_MS . 'ms)');
             return false;
         }
         
