@@ -107,6 +107,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     public $debug_mode;
     public $client;
 
+    const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
+        
     /**
      * Singleton instance
      * 
@@ -1269,8 +1271,6 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
     
     function verify_timestamp($timestamp) {
-        define('TIMESTAMP_TOLERANCE_MS', 5 * 60 * 1000);
-        
         $currentTime = floor(microtime(true) * 1000);
 
         if ($this->debug_mode) {
