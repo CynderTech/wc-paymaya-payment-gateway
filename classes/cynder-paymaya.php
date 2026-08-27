@@ -420,7 +420,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     "state" => $order->get_shipping_state(),
                     "zipCode" => $shippingZipCode,
                     "countryCode" => $shippingCountry,
-                    "shippingType" => 'ST', // standard shipping is hard-coded for now
+                    "shippingType" => 'ST', // TODO: standard shipping is hard-coded for now
                     "phone" => $order->get_billing_phone(),
                     "email" => $order->get_billing_email()
                 ),
