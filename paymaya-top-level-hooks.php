@@ -114,7 +114,7 @@ add_action(
 function cynder_paymaya_capture_payment() {
     $orderId = isset($_POST['order_id']) ? sanitize_key($_POST['order_id']) : null;
 
-    if (!isset($orderId)) {
+    if (empty($orderId)) {
         return wp_send_json(
             array('error' => '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Invalid order ID'),
             400
@@ -129,18 +129,11 @@ function cynder_paymaya_capture_payment() {
         return wp_send_json(array('error' => 'Permission denied'), 403);
     }
 
-    $captureAmount = isset($_POST['capture_amount']) ? sanitize_text_field($_POST['capture_amount']) : null;
+    $captureAmount = isset($_POST['capture_amount']) ? (float) sanitize_text_field($_POST['capture_amount']) : null;
 
-    if (!isset($captureAmount)) {
+    if (empty($captureAmount) || $captureAmount <= 0) {
         return wp_send_json(
             array('error' => '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Invalid capture amount'),
-            400
-        );
-    }
-
-    if (!isset($orderId)) {
-        return wp_send_json(
-            array('error' => '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Invalid order ID'),
             400
         );
     }
@@ -254,7 +247,7 @@ function cynder_paymaya_catch_redirect() {
 
     $orderId = isset($_GET['order']) ? sanitize_key($_GET['order']) : null;
 
-    if (!isset($orderId)) {
+    if (empty($orderId)) {
         /** Check order ID */
         wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] No order found with ID ' . $orderId);
         wc_add_notice('Something went wrong, please contact Maya support.', 'error');
