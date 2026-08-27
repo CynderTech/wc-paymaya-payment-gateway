@@ -678,6 +678,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     return strtotime($a['createdAt']) <=> strtotime($b['createdAt']);
                 });
 
+                // In PHP 8.2, usort always returns true which will make this check redundant.
                 if (!$sorted) {
                     return new WP_Error(400, 'Something went wrong with refunding the captured payments');
                 }
