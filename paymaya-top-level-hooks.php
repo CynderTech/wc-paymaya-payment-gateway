@@ -93,7 +93,7 @@ function cynder_paymaya_scripts($hook) {
         'order_id' => $orderId,
         'amount_authorized' => floatval($authorizedOrCapturedPayment['amount']),
         'amount_captured' => floatval($authorizedOrCapturedPayment['capturedAmount']),
-        'nonce' => wp_create_nonce('cynder_paymaya_capture_nonce'),
+        'nonce' => wp_create_nonce('cynder_paymaya_capture_nonce_' . $orderId),
     );
 
     wp_register_script(
@@ -112,7 +112,16 @@ add_action(
 );
 
 function cynder_paymaya_capture_payment() {
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cynder_paymaya_capture_nonce')) {
+    $orderId = isset($_POST['order_id']) ? sanitize_key($_POST['order_id']) : null;
+
+    if (!isset($orderId)) {
+        return wp_send_json(
+            array('error' => '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Invalid order ID'),
+            400
+        );
+    }
+
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'cynder_paymaya_capture_nonce_' . $orderId)) {
         return wp_send_json(array('error' => 'Invalid security token'), 403);
     }
 
@@ -121,7 +130,6 @@ function cynder_paymaya_capture_payment() {
     }
 
     $captureAmount = isset($_POST['capture_amount']) ? sanitize_text_field($_POST['capture_amount']) : null;
-    $orderId = isset($_POST['order_id']) ? sanitize_key($_POST['order_id']) : null;
 
     if (!isset($captureAmount)) {
         return wp_send_json(
