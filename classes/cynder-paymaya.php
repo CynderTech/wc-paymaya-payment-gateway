@@ -269,17 +269,17 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'webhook_success' => array(
                 'title' => 'Webhook Checkout Success URL',
                 'type' => 'text',
-                'default' => get_home_url() . '?wc-api=cynder_paymaya'
+                'default' => home_url( '/?wc-api=cynder_paymaya' )
             ),
             'webhook_failure' => array(
                 'title' => 'Webhook Checkout Failure URL',
                 'type' => 'text',
-                'default' => get_home_url() . '?wc-api=cynder_paymaya'
+                'default' => home_url( '/?wc-api=cynder_paymaya' )
             ),
             'webhook_payment_status' => array(
                 'title' => 'Webhook Payment Status URL',
                 'type' => 'text',
-                'default' => get_home_url() . '?wc-api=cynder_paymaya_payment'
+                'default' => home_url( '/?wc-api=cynder_paymaya_payment' )
             ),
             'debug_mode' => array(
                 'title' => 'Debug Mode',
@@ -387,7 +387,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         
         $orderItemArray = [];
 
-        $catchRedirectUrl = get_home_url() . '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId;
+        $catchRedirectUrl = home_url( '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId );
 
         $shippingFirstName = $order->get_shipping_first_name();
         $shippingLastName = $order->get_shipping_last_name();

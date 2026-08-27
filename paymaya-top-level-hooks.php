@@ -258,7 +258,7 @@ function cynder_paymaya_catch_redirect() {
         /** Check order ID */
         wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] No order found with ID ' . $orderId);
         wc_add_notice('Something went wrong, please contact Maya support.', 'error');
-        wp_safe_redirect(get_home_url());
+        wp_safe_redirect(home_url());
     }
 
     $order = wc_get_order($orderId);
@@ -327,7 +327,7 @@ function update_paymaya_plugin() {
         }
     }
 
-    $webhookUrl = isset($mainPluginSettings['webhook_payment_status']) ? $mainPluginSettings['webhook_payment_status'] : get_home_url() . '?wc-api=cynder_paymaya_payment';
+    $webhookUrl = isset($mainPluginSettings['webhook_payment_status']) ? $mainPluginSettings['webhook_payment_status'] : home_url( '/?wc-api=cynder_paymaya_payment' );
 
     $createdWebhook = $client->createWebhook('PAYMENT_SUCCESS', $webhookUrl);
 
