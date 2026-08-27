@@ -264,6 +264,17 @@ function cynder_paymaya_catch_redirect() {
         exit;
     }
 
+    // Extract the request key and validate it against the actual order key
+    $requestKey = isset($_GET['key']) ? sanitize_text_field($_GET['key']) : '';
+    $actualKey = $order->get_order_key();
+
+    if (empty($requestKey) || !hash_equals($actualKey, $requestKey)) {
+        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] Unauthorized redirect attempt for order ID ' . $orderId);
+        wc_add_notice('Invalid or unauthorized request.', 'error');
+        wp_safe_redirect(home_url());
+        exit;
+    }
+
     $status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 
     if ($status === 'success') {

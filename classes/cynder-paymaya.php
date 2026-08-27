@@ -357,7 +357,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         
         $orderItemArray = [];
 
-        $catchRedirectUrl = home_url( '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId );
+        $orderKey = $order->get_order_key();
+        $catchRedirectUrl = home_url( '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId . '&key=' . $orderKey );
 
         $shippingFirstName = $this->get_address_fallback($order, 'first_name');
         $shippingLastName  = $this->get_address_fallback($order, 'last_name');
