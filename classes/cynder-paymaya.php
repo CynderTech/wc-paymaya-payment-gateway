@@ -368,41 +368,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         $catchRedirectUrl = home_url( '/?wc-api=cynder_paymaya_catch_redirect&order=' . $orderId );
 
-        $shippingFirstName = $order->get_shipping_first_name();
-        $shippingLastName = $order->get_shipping_last_name();
-        $shippingLine1 = $order->get_shipping_address_1();
-        $shippingLine2 = $order->get_shipping_address_2();
-        $shippingCity = $order->get_shipping_city();
-        $shippingZipCode = $order->get_shipping_postcode();
-        $shippingCountry = $order->get_shipping_country();
-
-        if (empty($shippingCountry)) {
-            $shippingCountry = $order->get_billing_country();
-        }
-
-        if (empty($shippingFirstName)) {
-            $shippingFirstName = $order->get_billing_first_name();
-        }
-
-        if (empty($shippingLastName)) {
-            $shippingLastName = $order->get_billing_last_name();
-        }
-
-        if (empty($shippingLine1)) {
-            $shippingLine1 = $order->get_billing_address_1();
-        }
-
-        if (empty($shippingLine2)) {
-            $shippingLine2 = $order->get_billing_address_2();
-        }
-
-        if (empty($shippingCity)) {
-            $shippingCity = $order->get_billing_city();
-        }
-
-        if (empty($shippingZipCode)) {
-            $shippingZipCode = $order->get_billing_postcode();
-        }
+        $shippingFirstName = $this->get_address_fallback($order, 'first_name');
+        $shippingLastName  = $this->get_address_fallback($order, 'last_name');
+        $shippingLine1     = $this->get_address_fallback($order, 'address_1');
+        $shippingLine2     = $this->get_address_fallback($order, 'address_2');
+        $shippingCity      = $this->get_address_fallback($order, 'city');
+        $shippingZipCode   = $this->get_address_fallback($order, 'postcode');
+        $shippingCountry   = $this->get_address_fallback($order, 'country');
 
         foreach ($order->get_items() as $orderItem) {
             array_push($orderItemArray, array(
@@ -1270,5 +1242,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         }
         
         return true;
+    }
+
+    private function get_address_fallback($order, $field_suffix) {
+        $shipping_method = "get_shipping_{$field_suffix}";
+        $billing_method = "get_billing_{$field_suffix}";
+        
+        $value = $order->$shipping_method();
+        
+        return empty($value) ? $order->$billing_method() : $value;
     }
 }
