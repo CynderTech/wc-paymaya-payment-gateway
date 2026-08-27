@@ -679,7 +679,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
                 $actionsToProcess = array();
 
-                do {
+                while ($amountValue > 0 && count($availableActions) > 0) {
                     $availableAction = array_shift($availableActions);
                     $actionType = $availableAction['action'];
                     $actionAmount = floatval($availableAction['amount']);
@@ -703,7 +703,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
                         array_push($actionsToProcess, $availableAction);
                     }
-                } while ($amountValue > 0 && count($availableActions) > 0);
+                }
 
                 if ($this->debug_mode) {
                     wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Actions to process ' . wc_print_r($actionsToProcess, true));
