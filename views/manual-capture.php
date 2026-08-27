@@ -10,12 +10,12 @@
         <tr>
             <td class="label">Amount already captured:</td>
             <td width="1%"></td>
-            <td class="total"><?php echo wp_kses_post(wc_price($capturedAmount, $order->get_currency())) ?></td>
+            <td class="total"><?php echo wp_kses_post(wc_price($capturedAmount, array('currency' => $order->get_currency()))) ?></td>
         </tr>
         <tr>
             <td class="label">Remaining order total:</td>
             <td width="1%"></td>
-            <td class="total"><?php echo wp_kses_post(wc_price($balance, $order->get_currency())) ?></td>
+            <td class="total"><?php echo wp_kses_post(wc_price($balance, array('currency' => $order->get_currency()))) ?></td>
         </tr>
     </table>
 </div>
@@ -26,21 +26,21 @@
                 <td class="label">Authorized total:</td>
                 <td width="1%"></td>
                 <td class="total total-authorized">
-                    <span class="woocommerce-Price-amount amount"><?php echo wp_kses_post(wc_price($authorizedAmount, $order->get_currency())) ?></span>
+                    <span class="woocommerce-Price-amount amount"><?php echo wp_kses_post(wc_price($authorizedAmount, array('currency' => $order->get_currency()))) ?></span>
                 </td>
             </tr>
             <tr>
                 <td class="label">Amount already captured:</td>
                 <td width="1%"></td>
                 <td class="total total-captured">
-                    <span class="woocommerce-Price-amount amount"><?php echo wp_kses_post(wc_price($capturedAmount, $order->get_currency())) ?></span>
+                    <span class="woocommerce-Price-amount amount"><?php echo wp_kses_post(wc_price($capturedAmount, array('currency' => $order->get_currency()))) ?></span>
                 </td>
             </tr>
             <tr>
                 <td class="label">Remaining order total:</td>
                 <td width="1%"></td>
                 <td class="total total-remaining">
-                    <span class="woocommerce-Price-amount amount"><?php echo wp_kses_post(wc_price($balance, $order->get_currency())) ?></span>
+                    <span class="woocommerce-Price-amount amount"><?php echo wp_kses_post(wc_price($balance, array('currency' => $order->get_currency()))) ?></span>
                 </td>
             </tr>
             <tr>
