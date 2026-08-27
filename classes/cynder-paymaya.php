@@ -1214,7 +1214,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         }
 
         return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $signature) {
-            return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption");
+            return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption") === 1;
         });
     }
     
