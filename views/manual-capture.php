@@ -1,3 +1,5 @@
+<?php if (!defined('ABSPATH')) { exit; } ?>
+
 </table>
     <table class="wc-order-totals" style="border-top: 1px solid #999; margin-top:12px; padding-top:12px">
         <tr>

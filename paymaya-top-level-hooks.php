@@ -1,5 +1,9 @@
 <?php
 
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 $fileDir = dirname(__FILE__);
 include_once $fileDir.'/classes/paymaya-client.php';
 
