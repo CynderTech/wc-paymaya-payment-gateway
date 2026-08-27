@@ -9,6 +9,7 @@
  * Version: 1.3.4
  * Requires at least: 5.3
  * Tested up to: 7.1
+ * Requires PHP: 7.2.5
  * WC requires at least: 3.9.3
  * WC tested up to: 11.0.1
  *
