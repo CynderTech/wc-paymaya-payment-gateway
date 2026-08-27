@@ -29,7 +29,7 @@ function cynder_paymaya_scripts($hook) {
     /** If gateway isn't enabled, don't load JS scripts */
     if ($paymentGatewayEnabled !== 'yes') return;
 
-    $orderId = isset($_GET['id']) ? absint($_GET['id']) : (isset($_GET['post']) ? absint($_GET['post']) : null);
+    $orderId = isset($_GET['id']) ? absint($_GET['id']) : (isset($_GET['post']) ? absint($_GET['post']) : 0);
     $order = wc_get_order($orderId);
 
     if (empty($order)) return;
