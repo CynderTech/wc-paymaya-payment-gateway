@@ -12,7 +12,7 @@ define('CYNDER_PAYMAYA_CAPTURE_PAYMENT_EVENT', 'capturePayment');
 define('CYNDER_PAYMAYA_UPDATE_EVENT', 'Update Maya Plugin');
 
 function cynder_paymaya_scripts($hook) {
-    if ($hook !== 'post.php') return;
+    if ($hook !== 'post.php' && $hook !== 'woocommerce_page_wc-orders') return;
 
     $paymentGatewaId = 'paymaya';
     $paymentGateways = WC_Payment_Gateways::instance();
@@ -25,7 +25,7 @@ function cynder_paymaya_scripts($hook) {
     /** If gateway isn't enabled, don't load JS scripts */
     if ($paymentGatewayEnabled !== 'yes') return;
 
-    $orderId = isset($_GET['post']) ? sanitize_key($_GET['post']) : null;
+    $orderId = isset($_GET['id']) ? absint($_GET['id']) : (isset($_GET['post']) ? absint($_GET['post']) : null);
     $order = wc_get_order($orderId);
 
     if (empty($order)) return;
