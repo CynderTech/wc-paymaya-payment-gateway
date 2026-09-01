@@ -1021,6 +1021,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function wc_order_item_add_action_buttons_callback($order) {
+        if ( $order->get_payment_method() !== $this->id ) {
+            return;
+        }
+
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Total refunded for order ID ' . $order->get_id() . ': ' . $order->get_total_refunded());
         }
