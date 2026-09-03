@@ -457,21 +457,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if (array_key_exists("error", $response)) {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '][' . CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT . '] ' . json_encode($response['error']));
-            
-            // Extract the error message safely
-            $errorMessage = 'Payment failed. Please check your credentials or try again.';
-            if (is_array($response['error'])) {
-                if (isset($response['error']['message'])) {
-                    $errorMessage = $response['error']['message'];
-                } elseif (isset($response['error']['error'])) {
-                    $errorMessage = $response['error']['error'];
-                }
-            } elseif (is_string($response['error'])) {
-                $errorMessage = $response['error'];
-            }
-
-            // Display the error as a notice on the checkout page
-            wc_add_notice( sanitize_text_field( (string) $errorMessage ), 'error' );
+            wc_add_notice('Payment failed. Please try again or try another payment method.', 'error');
             
             return null;
         }
