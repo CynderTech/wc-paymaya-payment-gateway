@@ -497,8 +497,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
-            return new WP_Error('paymaya_error', is_array($payments['error']) ? wp_json_encode($payments['error']) : (string) $payments['error']);
+            // Normalize the error to a string once
+            $errorString = is_array($payments['error']) ? wp_json_encode($payments['error']) : (string) $payments['error'];
+            
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $errorString);
+            return new WP_Error('paymaya_error', $errorString);
         }
 
         $amountValue = floatval($amount);
