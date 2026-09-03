@@ -471,7 +471,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             }
 
             // Display the error as a notice on the checkout page
-            wc_add_notice( esc_html( (string) $errorMessage ), 'error' );
+            wc_add_notice( sanitize_text_field( (string) $errorMessage ), 'error' );
             
             return null;
         }
