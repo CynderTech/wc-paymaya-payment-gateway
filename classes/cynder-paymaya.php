@@ -457,6 +457,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if (array_key_exists("error", $response)) {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '][' . CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT . '] ' . json_encode($response['error']));
+            wc_add_notice('Payment failed. Please try again or try another payment method.', 'error');
+            
             return null;
         }
 
@@ -481,8 +483,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
-            return false;
+            // Normalize the error to a string once
+            $errorString = is_array($payments['error']) ? wp_json_encode($payments['error']) : (string) $payments['error'];
+            
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $errorString);
+            return new WP_Error('paymaya_error', $errorString);
         }
 
         $amountValue = floatval($amount);
@@ -1021,6 +1026,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function wc_order_item_add_action_buttons_callback($order) {
+        if ( $order->get_payment_method() !== $this->id ) {
+            return;
+        }
+
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Total refunded for order ID ' . $order->get_id() . ': ' . $order->get_total_refunded());
         }
