@@ -457,6 +457,20 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if (array_key_exists("error", $response)) {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '][' . CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT . '] ' . json_encode($response['error']));
+            
+            // Extract the error message safely
+            $errorMessage = 'Payment failed. Please check your credentials or try again.';
+            if (isset($response['error']['message'])) {
+                $errorMessage = $response['error']['message'];
+            } elseif (isset($response['error']['error'])) {
+                $errorMessage = $response['error']['error'];
+            } elseif (is_string($response['error'])) {
+                $errorMessage = $response['error'];
+            }
+
+            // Display the error as a notice on the checkout page
+            wc_add_notice($errorMessage, 'error');
+            
             return null;
         }
 
@@ -482,7 +496,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if (array_key_exists("error", $payments)) {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
-            return false;
+            return new WP_Error('paymaya_error', is_array($payments['error']) ? json_encode($payments['error']) : $payments['error']);
         }
 
         $amountValue = floatval($amount);
