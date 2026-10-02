@@ -32,7 +32,7 @@ Maya only sends webhooks from its own IP addresses, so the plugin checks the sen
 
 **Symptom:** customers pay but orders stay "Pending payment", and the WooCommerce log (WooCommerce > Status > Logs) shows "Webhook has a valid Maya signature but came from IP ...". An error notice also appears in the WordPress admin.
 
-**Cloudflare connecting directly to your server:** works automatically, nothing to do. If a load balancer sits between Cloudflare and your server, follow the steps below using the load balancer's IPs (Cloudflare's own addresses are skipped automatically).
+**Cloudflare connecting directly to your server:** works automatically, nothing to do. If a load balancer sits between Cloudflare and your server, follow the steps below using the load balancer's IPs (the visitor's IP is then taken from Cloudflare's `CF-Connecting-IP` header).
 
 **Any other proxy, CDN or load balancer:** go to WooCommerce > Settings > Payments > Maya and fill in the **Proxy / CDN** section:
 1. **Trusted Proxy Header** - the header your proxy uses to pass on the visitor's IP (`X-Forwarded-For` for most load balancers, such as AWS ALB/ELB and nginx).

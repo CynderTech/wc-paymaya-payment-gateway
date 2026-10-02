@@ -8,3 +8,4 @@ phpunit.xml.dist
 svnignore.txt
 tests
 vendor
+.distignore

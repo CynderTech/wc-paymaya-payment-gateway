@@ -185,8 +185,24 @@ class WebhookGuardTest extends TestCase {
 
     /** Cloudflare -> load balancer -> origin: the LB appends the Cloudflare edge IP to X-Forwarded-For. */
     public function test_cloudflare_edge_behind_load_balancer_is_skipped_in_forwarded_chain() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '203.0.113.50, 172.70.1.1', 'HTTP_CF_CONNECTING_IP' => '203.0.113.50');
+        $this->assertSame('203.0.113.50', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    /** Entries left of the Cloudflare hop are not necessarily Cloudflare's; CF-Connecting-IP is authoritative. */
+    public function test_spoofed_left_hand_forwarded_entry_behind_cloudflare_is_ignored() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235, 172.70.1.1', 'HTTP_CF_CONNECTING_IP' => '203.0.113.50');
+        $this->assertSame('203.0.113.50', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    public function test_cloudflare_hop_without_cf_header_falls_back_to_peer() {
         $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235, 172.70.1.1');
-        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+        $this->assertSame('10.0.0.5', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    public function test_overly_broad_ranges_are_refused() {
+        $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges("0.0.0.0/0\n::/0\n4.0.0.0/7\n2001::/31\n::ffff:0.0.0.0/96"));
+        $this->assertSame(array('10.0.0.0/8', '2001:db8::/32'), Cynder_Paymaya_Webhook_Guard::parse_ranges("10.0.0.0/8\n2001:db8::/32"));
     }
 
     public function test_amounts_are_compared_to_the_cent() {
@@ -208,7 +224,7 @@ class WebhookGuardTest extends TestCase {
         $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges('::ffff:10.0.0.0/64'));
         $this->assertSame(array('::ffff:10.0.0.0/64'), Cynder_Paymaya_Webhook_Guard::invalid_range_entries('::ffff:10.0.0.0/64'));
         // Real IPv6 ranges are untouched.
-        $this->assertSame(array('2001:db8::/32', '::/0'), Cynder_Paymaya_Webhook_Guard::parse_ranges("2001:db8::/32\n::/0"));
+        $this->assertSame(array('2001:db8::/32'), Cynder_Paymaya_Webhook_Guard::parse_ranges("2001:db8::/32"));
     }
 
     public function test_configured_mapped_proxy_matches_mapped_peer() {

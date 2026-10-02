@@ -100,6 +100,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     public $debug_mode;
     public $client;
     private $rejection_reason = '';
+    const GATEWAY_ID = 'paymaya';
+    const WEBHOOK_LOOKUP_TIMEOUT = 3;
     const SOURCE_REJECTED_OPTION = 'cynder_paymaya_source_rejected';
     private const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
 
@@ -110,7 +112,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
      */
     public function __construct()
     {
-        $this->id = 'paymaya';
+        $this->id = self::GATEWAY_ID;
         $this->has_fields = true;
         $this->method_title = 'Payments via Maya';
         $this->method_description = 'Secure online payments via Maya';
@@ -322,7 +324,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return;
         }
 
-        $settingsUrl = admin_url('admin.php?page=wc-settings&tab=checkout&section=paymaya');
+        $settingsUrl = admin_url('admin.php?page=wc-settings&tab=checkout&section=' . self::GATEWAY_ID);
 
         printf(
             '<div class="notice notice-error"><p><strong>Maya:</strong> a payment webhook was rejected on %s because it came from IP <code>%s</code>, which is not a Maya address. Paid orders may be stuck as pending. If your site is behind a proxy or load balancer, set <a href="%s">Trusted Proxy Header and Trusted Proxy IPs</a> in the Maya settings.</p></div>',
@@ -338,7 +340,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $invalid = Cynder_Paymaya_Webhook_Guard::invalid_range_entries($value);
 
         if (!empty($invalid)) {
-            WC_Admin_Settings::add_error('Maya: these Trusted Proxy IPs are not valid IP addresses or CIDR ranges and were not saved: ' . esc_html(implode(', ', $invalid)));
+            $message = 'Maya: these Trusted Proxy IPs were not saved because they are not valid IP addresses or CIDR ranges, or are broader than /' . Cynder_Paymaya_Webhook_Guard::MIN_PREFIX_IPV4 . ' (IPv4) or /' . Cynder_Paymaya_Webhook_Guard::MIN_PREFIX_IPV6 . ' (IPv6): ' . implode(', ', $invalid);
+
+            if (class_exists('WC_Admin_Settings')) {
+                WC_Admin_Settings::add_error($message);
+            } else {
+                $this->add_error($message);
+            }
         }
 
         return implode("\n", Cynder_Paymaya_Webhook_Guard::parse_ranges($value));
@@ -1013,15 +1021,15 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 $confirmedPayment = $this->confirm_successful_payment($order, $referenceNumber);
 
                 if ($confirmedPayment === null) {
-                    $order->add_order_note('Maya payment webhook ' . $transactionRefNumber . ' received but the payment could not be confirmed with Maya (lookup failed). Waiting for Maya to retry; check the payment on the Maya dashboard if this order stays pending.');
+                    $this->add_order_note_once($order, 'lookup-failed-' . $transactionRefNumber, 'Maya payment webhook ' . $transactionRefNumber . ' received but the payment could not be confirmed with Maya (lookup failed). Waiting for Maya to retry; check the payment on the Maya dashboard if this order stays pending.');
                     status_header(503);
                     die();
                 }
 
                 if ($confirmedPayment === false) {
                     wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook claimed success for order ' . $referenceNumber . ' but Maya has no matching successful payment. Order left unchanged.');
-                    $order->add_order_note('Maya payment webhook ' . $transactionRefNumber . ' reported success but no matching successful payment (reference, amount, currency) was found at Maya. Order left unchanged; check the payment on the Maya dashboard.');
-                    /** Retryable: Maya's payment records can lag behind the webhook. Maya retries on non-2xx (4 attempts over ~1h). */
+                    $this->add_order_note_once($order, 'no-match-' . $transactionRefNumber, 'Maya payment webhook ' . $transactionRefNumber . ' reported success but no matching successful payment (reference, amount, currency) was found at Maya. Order left unchanged; check the payment on the Maya dashboard.');
+                    /** Retryable: Maya's payment records can lag behind the webhook. Maya retries on non-2xx, up to 4 attempts over ~1h; a 2xx would end retries (https://developers.maya.ph/reference/configuring-your-webhook-for-maya-checkout). */
                     status_header(503);
                     die();
                 }
@@ -1058,7 +1066,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 die();
             }
 
-            $payments = $this->client->getPaymentViaRrn($referenceNumber);
+            $payments = $this->client->getPaymentViaRrn($referenceNumber, self::WEBHOOK_LOOKUP_TIMEOUT);
 
             if ($this->debug_mode) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
@@ -1112,8 +1120,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             if ($status === 'PAYMENT_SUCCESS' && $isFullyCaptured && !$isConfirmedCapture) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook claimed success for order ' . $referenceNumber . ' but Maya\'s payment does not match the order reference, total or currency. Order left unchanged.');
-                $order->add_order_note('Maya payment webhook ' . $transactionRefNumber . ' reported success but Maya\'s payment record does not match the order reference, total or currency. Order left unchanged; check the payment on the Maya dashboard.');
-                status_header(503);
+                $this->add_order_note_once($order, 'mismatch-' . $transactionRefNumber, 'Maya payment webhook ' . $transactionRefNumber . ' reported success but Maya\'s payment record does not match the order reference, total or currency. Order left unchanged; check the payment on the Maya dashboard.');
+                /** Final: a record that is fully captured but has the wrong reference, total, currency or status will not start matching on retry. */
+                status_header(204);
                 die();
             }
 
@@ -1315,6 +1324,19 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
     
 
+    /** Add an order note once per $key (e.g. per webhook id), so Maya's retries do not repeat it. */
+    function add_order_note_once($order, $key, $note) {
+        $metaKey = '_cynder_paymaya_note_' . md5($key);
+
+        if ($order->get_meta($metaKey) !== '') {
+            return;
+        }
+
+        $order->add_order_note($note);
+        $order->update_meta_data($metaKey, '1');
+        $order->save_meta_data();
+    }
+
     /**
      * Whether a payment record from Maya belongs to this order, has an acceptable status and matches the order total.
      * Every path that calls payment_complete() must pass this, so a webhook body alone never completes an order.
@@ -1329,7 +1351,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
      * @return array|false|null The matching Maya payment, false if none matches, null if Maya could not be reached.
      */
     function confirm_successful_payment($order, $referenceNumber) {
-        $payments = $this->client->getPaymentViaRrn($referenceNumber);
+        $payments = $this->client->getPaymentViaRrn($referenceNumber, self::WEBHOOK_LOOKUP_TIMEOUT);
 
         if (!is_array($payments) || array_key_exists('error', $payments)) {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Could not confirm payment with Maya for order ' . $referenceNumber);

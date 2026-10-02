@@ -44,6 +44,9 @@ class Cynder_Paymaya_Webhook_Guard {
     );
 
     /** Headers a merchant may choose to trust, keyed by the value stored in the gateway settings. */
+    const MIN_PREFIX_IPV4 = 8;
+    const MIN_PREFIX_IPV6 = 32;
+
     const PROXY_HEADERS = array(
         'x-forwarded-for' => 'HTTP_X_FORWARDED_FOR',
         'x-real-ip' => 'HTTP_X_REAL_IP',
@@ -80,7 +83,7 @@ class Cynder_Paymaya_Webhook_Guard {
             $value = isset($server[$serverKey]) ? (string) $server[$serverKey] : '';
 
             // Walk right to left: the right-most entry not added by a trusted proxy is the client.
-            // Cloudflare edges count as trusted hops too, so Cloudflare -> load balancer -> origin works.
+            // Cloudflare -> load balancer -> origin: the load balancer appends the Cloudflare edge as the last hop.
             $hops = array_reverse(array_map('trim', explode(',', $value)));
 
             foreach ($hops as $hop) {
@@ -90,9 +93,18 @@ class Cynder_Paymaya_Webhook_Guard {
                     break; // Garbage in the chain: stop trusting it.
                 }
 
-                if (!self::is_ip_in_ranges($hop, $trustedRanges) && !self::is_ip_in_ranges($hop, self::CLOUDFLARE_RANGES)) {
-                    return $hop;
+                if (self::is_ip_in_ranges($hop, $trustedRanges)) {
+                    continue;
                 }
+
+                // The request really passed through Cloudflare (our proxy appended a Cloudflare edge as the last hop).
+                // Entries further left are not guaranteed to be Cloudflare's own, so rely on CF-Connecting-IP, which
+                // Cloudflare always sets itself. If it is missing or invalid, fall back to the connection address.
+                if (self::is_ip_in_ranges($hop, self::CLOUDFLARE_RANGES)) {
+                    return ($cf !== '' && filter_var($cf, FILTER_VALIDATE_IP) !== false) ? $cf : $remote;
+                }
+
+                return $hop;
             }
         }
 
@@ -167,8 +179,20 @@ class Cynder_Paymaya_Webhook_Guard {
             return null;
         }
 
-        if (strlen($packed) === 16 && self::normalize_ip($parts[0]) !== $parts[0] && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
-            return $bits >= 96 ? inet_ntop(substr($packed, 12)) . '/' . ($bits - 96) : null;
+        if (strlen($packed) === 16 && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
+            if ($bits < 96) {
+                return null;
+            }
+
+            $packed = substr($packed, 12);
+            $parts[0] = inet_ntop($packed);
+            $bits -= 96;
+            $maxBits = 32;
+        }
+
+        // Refuse ranges so broad they would reopen the allowlist (/0 and anything shorter than /8 IPv4 or /32 IPv6).
+        if ($bits < ($maxBits === 32 ? self::MIN_PREFIX_IPV4 : self::MIN_PREFIX_IPV6)) {
+            return null;
         }
 
         return $parts[0] . '/' . $bits;

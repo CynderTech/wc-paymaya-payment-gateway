@@ -118,10 +118,15 @@ class Cynder_PaymayaClient {
     }
 
     /** https://hackmd.io/@paymaya-pg/Checkout#Get-Payments-via-RRN---GET-httpspg-sandboxpaymayacompaymentsv1payment-rrnsrrn */
-    public function getPaymentViaRrn($orderId) {
+    public function getPaymentViaRrn($orderId, $timeout = null) {
         $requestArgs = array(
             'headers' => $this->getHeaders()
         );
+
+        /** Webhook handlers pass a short timeout so a slow Maya API becomes a quick, retryable 503. */
+        if ($timeout !== null) {
+            $requestArgs['timeout'] = $timeout;
+        }
 
         $response = wp_remote_get($this->getBaseUrl() . '/payments/v1/payment-rrns/' . $orderId, $requestArgs);
 
