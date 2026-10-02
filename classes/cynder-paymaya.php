@@ -17,6 +17,7 @@ if (!defined('ABSPATH')) {
 
 $fileDir = plugin_dir_path( __FILE__ );
 include_once $fileDir.'/paymaya-client.php';
+include_once $fileDir.'/cynder-paymaya-webhook-guard.php';
 
 /** Error identifiers */
 define('CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK', 'Process Payment');
@@ -769,13 +770,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function get_source() {
-        // Only the connection's address is trustworthy; forwarding headers are client-controlled.
-        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
-
         /**
-         * Merchants behind a trusted proxy/CDN (e.g. Cloudflare) can resolve the real client IP here,
-         * e.g. from CF-Connecting-IP, but only if the origin accepts traffic from that proxy alone.
+         * Only the TCP peer is trusted (CF-Connecting-IP too, but only when the peer is a Cloudflare edge).
+         * Merchants behind another trusted proxy/CDN can resolve the real client IP with this filter,
+         * provided the origin only accepts traffic from that proxy.
          */
+        $ip = Cynder_Paymaya_Webhook_Guard::resolve_source_ip($_SERVER);
+
         return (string) apply_filters('cynder_paymaya_webhook_source_ip', $ip);
     }
 
@@ -930,7 +931,21 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             /** With correct data based on assumptions */
             if (abs($amountPaid-floatval($order->get_total())) < PHP_FLOAT_EPSILON && $status === 'PAYMENT_SUCCESS') {
-                $order->payment_complete($transactionRefNumber);
+                /** Never rely on the webhook body alone: confirm the payment with Maya before releasing the order. */
+                $confirmedPayment = $this->confirm_successful_payment($order, $referenceNumber);
+
+                if ($confirmedPayment === null) {
+                    status_header(503);
+                    die();
+                }
+
+                if ($confirmedPayment === false) {
+                    wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook claimed success for order ' . $referenceNumber . ' but Maya has no matching successful payment. Order left unchanged.');
+                    status_header(204);
+                    die();
+                }
+
+                $order->payment_complete($confirmedPayment['id']);
             } else if ($status === 'PAYMENT_FAILED' || $status === 'PAYMENT_EXPIRED' || $status === 'AUTH_FAILED') {
                 $note = '';
 
@@ -1188,11 +1203,28 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
     
 
-    function array_some($data, $callback) {
-        foreach ($data as $item) {
-            if ($callback($item) === true) {
-                return true;
-            }
+    /**
+     * Ask Maya for the order's payments and find a successful one matching the order reference and total.
+     *
+     * @return array|false|null The matching Maya payment, false if none matches, null if Maya could not be reached.
+     */
+    function confirm_successful_payment($order, $referenceNumber) {
+        $payments = $this->client->getPaymentViaRrn($referenceNumber);
+
+        if (!is_array($payments) || array_key_exists('error', $payments)) {
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Could not confirm payment with Maya for order ' . $referenceNumber);
+            return null;
+        }
+
+        $orderTotal = floatval($order->get_total());
+
+        foreach ($payments as $maya) {
+            if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['requestReferenceNumber'])) continue;
+            if ($maya['status'] !== 'PAYMENT_SUCCESS') continue;
+            if (strval($maya['requestReferenceNumber']) !== strval($referenceNumber)) continue;
+            if (abs(floatval($maya['amount']) - $orderTotal) >= PHP_FLOAT_EPSILON) continue;
+
+            return $maya;
         }
 
         return false;
@@ -1221,17 +1253,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION;
         }
 
-        $binarySignature = (is_string($signature) && ctype_xdigit($signature) && strlen($signature) % 2 === 0)
-            ? hex2bin($signature)
-            : false;
-
-        if ($binarySignature === false) {
-            return false;
-        }
-
-        return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $binarySignature) {
-            return openssl_verify($verifyString, $binarySignature, $publicKey, "sha256WithRSAEncryption") === 1;
-        });
+        return Cynder_Paymaya_Webhook_Guard::is_valid_signature($verifyString, $signature, $publicKeys);
     }
     
     function verify_timestamp($timestamp) {

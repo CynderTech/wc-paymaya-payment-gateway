@@ -26,3 +26,24 @@ With Maya Checkout, your website or app can directly accept credit and debit car
 This version (1.3.4) is currently compatible with the following WordPress and WooCommerce version:
 * WordPress 6.8.2
 * WooCommerce 10.1.2
+
+### Webhooks behind a proxy or CDN
+The webhook endpoint only accepts requests from Maya's published IP addresses. The sender's IP is the connection address (`REMOTE_ADDR`); forwarding headers like `X-Forwarded-For` are not trusted because clients can set them. Cloudflare is detected automatically: `CF-Connecting-IP` is used when the request comes from a Cloudflare edge IP.
+
+If your site sits behind any other reverse proxy or load balancer, `REMOTE_ADDR` will be the proxy's address and Maya's webhooks will be rejected. Resolve the real client IP with the `cynder_paymaya_webhook_source_ip` filter, for example in a small mu-plugin:
+
+```php
+add_filter('cynder_paymaya_webhook_source_ip', function ($ip) {
+    // Only trust this header if your origin accepts traffic from the proxy alone.
+    if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+        return trim($_SERVER['HTTP_X_REAL_IP']);
+    }
+    return $ip;
+});
+```
+
+### Running the tests
+```
+composer install
+vendor/bin/phpunit
+```
