@@ -363,3 +363,18 @@ function update_paymaya_plugin() {
 }
 
 add_action('woocommerce_paymaya_updated', 'update_paymaya_plugin');
+
+/** Registered once here rather than in the gateway constructor, which WooCommerce instantiates lazily. */
+add_action('admin_notices', function () {
+    if (class_exists('Cynder_Paymaya_Gateway')) {
+        Cynder_Paymaya_Gateway::webhook_source_rejected_notice();
+    }
+});
+
+add_action(Cynder_Paymaya_Gateway::RECONCILE_HOOK, function ($orderId, $attempt = 1) {
+    $gateways = WC_Payment_Gateways::instance()->payment_gateways();
+
+    if (isset($gateways[Cynder_Paymaya_Gateway::GATEWAY_ID])) {
+        $gateways[Cynder_Paymaya_Gateway::GATEWAY_ID]->reconcile_order($orderId, $attempt);
+    }
+}, 10, 2);
