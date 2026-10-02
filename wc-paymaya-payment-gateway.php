@@ -6,7 +6,7 @@
  * Author: PayMaya
  * Author URI: https://www.paymaya.com
  * License: GPLv3
- * Version: 1.3.4
+ * Version: 1.4.0
  * Requires at least: 5.3
  * Tested up to: 7.1
  * Requires PHP: 7.2.5
@@ -60,7 +60,7 @@ function Paymaya_Init_Gateway_class()
     }
 
     define('CYNDER_PAYMAYA_MAIN_FILE', __FILE__);
-    define('CYNDER_PAYMAYA_VERSION', '1.2.0');
+    define('CYNDER_PAYMAYA_VERSION', '1.4.0');
     define('CYNDER_PAYMAYA_BASE_SANDBOX_URL',  'https://pg-sandbox.paymaya.com');
     define('CYNDER_PAYMAYA_BASE_PRODUCTION_URL',  'https://pg.maya.ph');
     define(

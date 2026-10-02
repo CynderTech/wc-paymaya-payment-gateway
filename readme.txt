@@ -51,6 +51,14 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 == Changelog ==
 
+= 1.4.0 =
+*Release Date - October 2, 2026*
+
+* **Behind a proxy or load balancer (not Cloudflare)?** Set *Trusted Proxy Header* and *Trusted Proxy IPs* in the Maya settings, or paid orders will stay "Pending payment".
+* Orders are now marked paid only after Maya confirms the payment.
+* Security improvements.
+* Tested with WordPress 7.1 and WooCommerce 11.0.1.
+
 = 1.3.4 =
 *Release Date - October 13, 2025*
 
@@ -174,3 +182,9 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 *Release Date - 21 September 2020*
 
 * Initial release
+
+== Upgrade Notice ==
+
+= 1.4.0 =
+Behind a proxy or load balancer (not Cloudflare)? Set the new Trusted Proxy options in the Maya settings, or paid orders will stay pending.
+
