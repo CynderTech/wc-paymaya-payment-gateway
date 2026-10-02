@@ -28,19 +28,17 @@ This version (1.3.4) is currently compatible with the following WordPress and Wo
 * WooCommerce 10.1.2
 
 ### Webhooks behind a proxy or CDN
-The webhook endpoint only accepts requests from Maya's published IP addresses. The sender's IP is the connection address (`REMOTE_ADDR`); forwarding headers like `X-Forwarded-For` are not trusted because clients can set them. Cloudflare is detected automatically: `CF-Connecting-IP` is used when the request comes from a Cloudflare edge IP.
+Maya only sends webhooks from its own IP addresses, so the plugin checks the sender's IP. The IP used is the connection address; client-settable headers like `X-Forwarded-For` are not trusted on their own.
 
-If your site sits behind any other reverse proxy or load balancer, `REMOTE_ADDR` will be the proxy's address and Maya's webhooks will be rejected. Resolve the real client IP with the `cynder_paymaya_webhook_source_ip` filter, for example in a small mu-plugin:
+**Symptom:** customers pay but orders stay "Pending payment", and the WooCommerce log (WooCommerce > Status > Logs) shows "Webhook has a valid Maya signature but came from IP ...". An error notice also appears in the WordPress admin.
 
-```php
-add_filter('cynder_paymaya_webhook_source_ip', function ($ip) {
-    // Only trust this header if your origin accepts traffic from the proxy alone.
-    if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
-        return trim($_SERVER['HTTP_X_REAL_IP']);
-    }
-    return $ip;
-});
-```
+**Cloudflare:** works automatically, nothing to do.
+
+**Any other proxy, CDN or load balancer:** go to WooCommerce > Settings > Payments > Maya and fill in the **Proxy / CDN** section:
+1. **Trusted Proxy Header** - the header your proxy uses to pass on the visitor's IP (`X-Forwarded-For` for most load balancers, such as AWS ALB/ELB and nginx).
+2. **Trusted Proxy IPs** - the IP addresses or ranges (CIDR) of your proxy or load balancer, one per line. The header is only trusted for requests coming from these addresses. If you leave this blank the header is ignored.
+
+Saving the settings clears the admin notice. Developers can still override the resolved IP with the `cynder_paymaya_webhook_source_ip` filter.
 
 ### Running the tests
 ```

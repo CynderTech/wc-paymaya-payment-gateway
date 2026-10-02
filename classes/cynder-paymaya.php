@@ -99,6 +99,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     public $webhook_failure;
     public $debug_mode;
     public $client;
+    private $rejection_reason = '';
+    private const SOURCE_REJECTED_OPTION = 'cynder_paymaya_source_rejected';
     private const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000;
 
     /**
@@ -149,6 +151,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'woocommerce_api_cynder_' . $this->id . '_payment',
             array($this, 'handle_payment_webhook_request')
         );
+
+        add_action('admin_notices', array($this, 'webhook_source_rejected_notice'));
 
         add_action(
             'woocommerce_order_item_add_action_buttons',
@@ -252,6 +256,30 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 'type' => 'text',
                 'default' => home_url( '/?wc-api=cynder_paymaya_payment' )
             ),
+            'proxy_title' => array(
+                'title' => 'Proxy / CDN',
+                'type' => 'title',
+                'description' => 'Maya only accepts webhooks from its own IP addresses, so the plugin must know the real IP of the sender.<br/>Cloudflare is detected automatically. <strong>Only fill this in if your site is behind another reverse proxy or load balancer</strong> and paid orders stay pending after payment. Leave blank otherwise.'
+            ),
+            'trusted_proxy_header' => array(
+                'title' => 'Trusted Proxy Header',
+                'type' => 'select',
+                'options' => array(
+                    '' => 'None (use the connection IP)',
+                    'x-forwarded-for' => 'X-Forwarded-For',
+                    'x-real-ip' => 'X-Real-IP',
+                ),
+                'default' => '',
+                'description' => 'The header your proxy uses to pass on the original sender\'s IP. Ignored unless Trusted Proxy IPs is also set.',
+                'desc_tip' => false,
+            ),
+            'trusted_proxy_ips' => array(
+                'title' => 'Trusted Proxy IPs',
+                'type' => 'textarea',
+                'default' => '',
+                'description' => 'IP addresses or ranges (CIDR) of your proxy or load balancer, one per line. The header above is only trusted for requests coming from these addresses, so nobody else can fake it. Ask your host if unsure.',
+                'desc_tip' => false,
+            ),
             'debug_mode' => array(
                 'title' => 'Debug Mode',
                 'type' => 'checkbox', 
@@ -281,8 +309,34 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         }
     }
 
+    /**
+     * Warn admins when Maya-signed webhooks were rejected only because of their source IP.
+     * Cleared when the gateway settings are saved.
+     */
+    public function webhook_source_rejected_notice() {
+        if (!current_user_can('manage_woocommerce')) {
+            return;
+        }
+
+        $rejected = get_option(self::SOURCE_REJECTED_OPTION);
+
+        if (!is_array($rejected) || empty($rejected['time']) || $rejected['time'] < time() - WEEK_IN_SECONDS) {
+            return;
+        }
+
+        $settingsUrl = admin_url('admin.php?page=wc-settings&tab=checkout&section=' . $this->id);
+
+        printf(
+            '<div class="notice notice-error"><p><strong>Maya:</strong> a payment webhook was rejected on %s because it came from IP <code>%s</code>, which is not a Maya address. Paid orders may be stuck as pending. If your site is behind a proxy or load balancer, set <a href="%s">Trusted Proxy Header and Trusted Proxy IPs</a> in the Maya settings.</p></div>',
+            esc_html(wp_date('Y-m-d H:i', (int) $rejected['time'])),
+            esc_html(isset($rejected['ip']) ? (string) $rejected['ip'] : ''),
+            esc_url($settingsUrl)
+        );
+    }
+
     public function process_admin_options() {
         $is_options_saved = parent::process_admin_options();
+        delete_option(self::SOURCE_REJECTED_OPTION);
 
         $webhookSuccessUrl = $this->get_option('webhook_success');
         $webhookFailureUrl = $this->get_option('webhook_failure');
@@ -771,16 +825,23 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function get_source() {
         /**
-         * Only the TCP peer is trusted (CF-Connecting-IP too, but only when the peer is a Cloudflare edge).
-         * Merchants behind another trusted proxy/CDN can resolve the real client IP with this filter,
-         * provided the origin only accepts traffic from that proxy.
+         * Only the TCP peer is trusted, plus CF-Connecting-IP when the peer is a Cloudflare edge, plus the
+         * merchant's configured proxy header when the peer is one of their trusted proxies.
+         * Developers can still override the resolved IP with this filter, provided the origin
+         * only accepts traffic from the proxy it trusts.
          */
-        $ip = Cynder_Paymaya_Webhook_Guard::resolve_source_ip($_SERVER);
+        $ip = Cynder_Paymaya_Webhook_Guard::resolve_source_ip(
+            $_SERVER,
+            (string) $this->get_option('trusted_proxy_header'),
+            Cynder_Paymaya_Webhook_Guard::parse_ranges($this->get_option('trusted_proxy_ips'))
+        );
 
         return (string) apply_filters('cynder_paymaya_webhook_source_ip', $ip);
     }
 
     function is_valid_source($source) {
+        $this->rejection_reason = '';
+
         $serverTimestamp = $_SERVER['HTTP_X_MAYA_WEBHOOK_TIMESTAMP'] ?? '';
         $envTimestamp = getenv('HTTP_X_MAYA_WEBHOOK_TIMESTAMP');
 
@@ -791,6 +852,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if (!$this->verify_timestamp($webhookTimestamp)) {
             /** Exit early if validation fails */
+            $this->rejection_reason = 'timestamp';
             return false;
         }
 
@@ -821,6 +883,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         }
         
         if ($webhookNonce === null || $webhookV1 === null) {
+            $this->rejection_reason = 'signature';
             if ($this->debug_mode) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook signatures not found');
             }
@@ -832,33 +895,29 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payment = json_decode($requestBody, true);
 
         if (!is_array($payment)) {
+            $this->rejection_reason = 'payload';
             return false;
         }
 
         if (!$this->verify_signature_v1($payment, $webhookV1, $webhookNonce)) {
+            $this->rejection_reason = 'signature';
             if ($this->debug_mode) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook signature mismatch');
             }
             return false;
         }
 
-        if ($this->sandbox === 'yes') {
-            return in_array(
-                $source,
-                array(
-                    '13.229.160.234',
-                    '3.1.199.75'
-                )
-            );
+        $mayaIps = $this->sandbox === 'yes'
+            ? array('13.229.160.234', '3.1.199.75')
+            : array('18.138.50.235', '3.1.207.200');
+
+        if (!in_array($source, $mayaIps, true)) {
+            /** Reached only after the signature verified, so Maya signed this request but it came from an unexpected IP. */
+            $this->rejection_reason = 'source_ip';
+            return false;
         }
 
-        return in_array(
-            $source,
-            array(
-                '18.138.50.235',
-                '3.1.207.200'
-            )
-        );
+        return true;
     }
 
     function handle_payment_webhook_request() {
@@ -877,6 +936,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             } else {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Source is invalid');
             }
+        }
+
+        if (!$isValidSource && $this->rejection_reason === 'source_ip') {
+            /** Logged regardless of debug mode: this is almost always a proxy/CDN misconfiguration. */
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook has a valid Maya signature but came from IP ' . $source . ', which is not a Maya IP. If your site is behind a proxy or load balancer, set Trusted Proxy Header and Trusted Proxy IPs in the Maya gateway settings.');
+            update_option(self::SOURCE_REJECTED_OPTION, array('ip' => $source, 'time' => time()), false);
         }
 
         if (!$isValidSource || !$isPostRequest || !$hasWcApiQuery || !$hasCorrectQuery) {

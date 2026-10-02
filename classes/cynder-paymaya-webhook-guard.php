@@ -43,14 +43,26 @@ class Cynder_Paymaya_Webhook_Guard {
         '2c0f:f248::/32',
     );
 
+    /** Headers a merchant may choose to trust, keyed by the value stored in the gateway settings. */
+    const PROXY_HEADERS = array(
+        'x-forwarded-for' => 'HTTP_X_FORWARDED_FOR',
+        'x-real-ip' => 'HTTP_X_REAL_IP',
+    );
+
     /**
      * Resolve the webhook sender's IP from $_SERVER-style data.
      *
-     * The TCP peer (REMOTE_ADDR) is the only trusted value, except that behind Cloudflare
-     * (peer is a Cloudflare edge IP) the CF-Connecting-IP header is used.
+     * The TCP peer (REMOTE_ADDR) is the only trusted value, except:
+     * - behind Cloudflare (peer is a Cloudflare edge IP), CF-Connecting-IP is used;
+     * - if the merchant configured a proxy header AND the peer is inside their trusted proxy ranges,
+     *   that header is used. With no trusted ranges the header is never honoured.
      * Other forwarding headers are client-controlled and never used.
+     *
+     * @param array  $server        $_SERVER-style data.
+     * @param string $proxyHeader   Key of self::PROXY_HEADERS, or '' for none.
+     * @param array  $trustedRanges CIDR ranges of the merchant's proxies (see parse_ranges()).
      */
-    public static function resolve_source_ip(array $server) {
+    public static function resolve_source_ip(array $server, $proxyHeader = '', array $trustedRanges = array()) {
         $remote = isset($server['REMOTE_ADDR']) ? (string) $server['REMOTE_ADDR'] : '';
 
         if ($remote === '') {
@@ -63,7 +75,52 @@ class Cynder_Paymaya_Webhook_Guard {
             return $cf;
         }
 
+        if (isset(self::PROXY_HEADERS[$proxyHeader]) && self::is_ip_in_ranges($remote, $trustedRanges)) {
+            $serverKey = self::PROXY_HEADERS[$proxyHeader];
+            $value = isset($server[$serverKey]) ? (string) $server[$serverKey] : '';
+
+            // Walk right to left: the right-most entry not added by a trusted proxy is the client.
+            $hops = array_reverse(array_map('trim', explode(',', $value)));
+
+            foreach ($hops as $hop) {
+                if (filter_var($hop, FILTER_VALIDATE_IP) === false) {
+                    break; // Garbage in the chain: stop trusting it.
+                }
+
+                if (!self::is_ip_in_ranges($hop, $trustedRanges)) {
+                    return $hop;
+                }
+            }
+        }
+
         return $remote;
+    }
+
+    /**
+     * Parse a merchant-entered list of IPs/CIDRs (one per line or comma separated) into CIDR ranges.
+     * Invalid entries are dropped.
+     */
+    public static function parse_ranges($text) {
+        $ranges = array();
+
+        foreach (preg_split('/[\s,]+/', (string) $text, -1, PREG_SPLIT_NO_EMPTY) as $entry) {
+            $parts = explode('/', $entry, 2);
+            $packed = @inet_pton($parts[0]);
+
+            if ($packed === false) {
+                continue;
+            }
+
+            $maxBits = strlen($packed) * 8;
+
+            if (count($parts) === 1) {
+                $ranges[] = $parts[0] . '/' . $maxBits;
+            } elseif (ctype_digit($parts[1]) && (int) $parts[1] <= $maxBits) {
+                $ranges[] = $parts[0] . '/' . (int) $parts[1];
+            }
+        }
+
+        return $ranges;
     }
 
     public static function is_ip_in_ranges($ip, array $ranges) {

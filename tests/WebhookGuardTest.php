@@ -93,4 +93,48 @@ class WebhookGuardTest extends TestCase {
         $this->assertFalse(Cynder_Paymaya_Webhook_Guard::is_ip_in_cidr('garbage', '173.245.48.0/20'));
         $this->assertFalse(Cynder_Paymaya_Webhook_Guard::is_ip_in_cidr('1.2.3.4', '1.2.3.4'));
     }
+
+    public function test_proxy_header_is_ignored_without_trusted_ranges() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235');
+        $this->assertSame('10.0.0.5', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array()));
+    }
+
+    public function test_proxy_header_is_ignored_when_peer_is_not_a_trusted_proxy() {
+        $server = array('REMOTE_ADDR' => '203.0.113.9', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235');
+        $this->assertSame('203.0.113.9', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    public function test_proxy_header_is_used_when_peer_is_a_trusted_proxy() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235');
+        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_REAL_IP' => '3.1.207.200');
+        $this->assertSame('3.1.207.200', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-real-ip', array('10.0.0.0/8')));
+    }
+
+    public function test_only_the_configured_header_is_read() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235');
+        $this->assertSame('10.0.0.5', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-real-ip', array('10.0.0.0/8')));
+        $this->assertSame('10.0.0.5', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'bogus', array('10.0.0.0/8')));
+    }
+
+    /** A client-supplied leading entry must not win over what the proxy appended. */
+    public function test_forwarded_for_uses_rightmost_untrusted_hop() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235, 203.0.113.77, 10.0.0.9');
+        $this->assertSame('203.0.113.77', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    public function test_garbage_in_forwarded_chain_falls_back_to_peer() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235, nonsense');
+        $this->assertSame('10.0.0.5', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    public function test_parse_ranges() {
+        $this->assertSame(
+            array('10.0.0.0/8', '192.168.1.5/32', '2001:db8::/32', '2001:db8::1/128'),
+            Cynder_Paymaya_Webhook_Guard::parse_ranges("10.0.0.0/8\n192.168.1.5, 2001:db8::/32  2001:db8::1")
+        );
+        $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges("nonsense\n10.0.0.0/99\n1.2.3.4/x\n"));
+        $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges(''));
+    }
 }
