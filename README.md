@@ -23,7 +23,7 @@ With Maya Checkout, your website or app can directly accept credit and debit car
 ### Don't have an account yet? [Click here to get started](https://enterprise.paymaya.com/solutions/plugins/woocommerce)
 
 ### Version Compatibility
-This version (1.4.0) is currently compatible with the following WordPress and WooCommerce version:
+This version (1.4.1) is currently compatible with the following WordPress and WooCommerce version:
 * WordPress 7.1
 * WooCommerce 11.0.1
 

@@ -3,7 +3,7 @@ Tags: payments, credit card
 Requires at least: 5.3
 Tested up to: 7.1
 Requires PHP: 7.2.5
-Stable tag: 1.3.4
+Stable tag: 1.4.1
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -51,7 +51,7 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 == Changelog ==
 
-= 1.4.0 =
+= 1.4.1 =
 *Release Date - October 2, 2026*
 
 * **Behind a proxy or load balancer (not Cloudflare)?** Set *Trusted Proxy Header* and *Trusted Proxy IPs* in the Maya settings, or paid orders will stay "Pending payment".
@@ -185,6 +185,6 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 == Upgrade Notice ==
 
-= 1.4.0 =
+= 1.4.1 =
 Behind a proxy or load balancer (not Cloudflare)? Set the new Trusted Proxy options in the Maya settings, or paid orders will stay pending.
 
