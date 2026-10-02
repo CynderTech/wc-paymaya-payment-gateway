@@ -23,9 +23,9 @@ With Maya Checkout, your website or app can directly accept credit and debit car
 ### Don't have an account yet? [Click here to get started](https://enterprise.paymaya.com/solutions/plugins/woocommerce)
 
 ### Version Compatibility
-This version (1.3.4) is currently compatible with the following WordPress and WooCommerce version:
-* WordPress 6.8.2
-* WooCommerce 10.1.2
+This version (1.4.0) is currently compatible with the following WordPress and WooCommerce version:
+* WordPress 7.1
+* WooCommerce 11.0.1
 
 ### Webhooks behind a proxy or CDN
 Maya only sends webhooks from its own IP addresses, so the plugin checks the sender's IP. The IP used is the connection address; client-settable headers like `X-Forwarded-For` are not trusted on their own.
