@@ -195,4 +195,24 @@ class Cynder_Paymaya_Webhook_Guard {
 
         return false;
     }
+
+    /**
+     * Whether a payment record returned by Maya belongs to the order (same reference), has an acceptable
+     * status and matches the order total. Every path that completes an order must pass this.
+     */
+    public static function is_payment_confirmed($maya, $orderTotal, $referenceNumber, array $allowedStatuses) {
+        if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['requestReferenceNumber'])) {
+            return false;
+        }
+
+        if (!in_array($maya['status'], $allowedStatuses, true)) {
+            return false;
+        }
+
+        if (strval($maya['requestReferenceNumber']) !== strval($referenceNumber)) {
+            return false;
+        }
+
+        return abs(floatval($maya['amount']) - floatval($orderTotal)) < PHP_FLOAT_EPSILON;
+    }
 }

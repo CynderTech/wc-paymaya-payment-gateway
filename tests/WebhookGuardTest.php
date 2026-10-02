@@ -137,4 +137,30 @@ class WebhookGuardTest extends TestCase {
         $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges("nonsense\n10.0.0.0/99\n1.2.3.4/x\n"));
         $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges(''));
     }
+
+    private function mayaPayment(array $override = array()) {
+        return array_merge(array('id' => 'p1', 'status' => 'PAYMENT_SUCCESS', 'amount' => 150.5, 'requestReferenceNumber' => '123'), $override);
+    }
+
+    public function test_payment_confirmation_accepts_matching_payment() {
+        $this->assertTrue(Cynder_Paymaya_Webhook_Guard::is_payment_confirmed($this->mayaPayment(), 150.5, '123', array('PAYMENT_SUCCESS')));
+        $this->assertTrue(Cynder_Paymaya_Webhook_Guard::is_payment_confirmed($this->mayaPayment(array('status' => 'CAPTURED', 'requestReferenceNumber' => 123)), '150.50', 123, array('AUTHORIZED', 'CAPTURED', 'DONE')));
+    }
+
+    /** @dataProvider mismatchedPayments */
+    public function test_payment_confirmation_rejects_mismatch($maya, $total, $reference, $statuses) {
+        $this->assertFalse(Cynder_Paymaya_Webhook_Guard::is_payment_confirmed($maya, $total, $reference, $statuses));
+    }
+
+    public function mismatchedPayments() {
+        return array(
+            'failed status' => array($this->mayaPayment(array('status' => 'PAYMENT_FAILED')), 150.5, '123', array('PAYMENT_SUCCESS')),
+            'status not allowed here' => array($this->mayaPayment(array('status' => 'AUTHORIZED')), 150.5, '123', array('PAYMENT_SUCCESS')),
+            'other order' => array($this->mayaPayment(array('requestReferenceNumber' => '124')), 150.5, '123', array('PAYMENT_SUCCESS')),
+            'wrong amount' => array($this->mayaPayment(array('amount' => 1)), 150.5, '123', array('PAYMENT_SUCCESS')),
+            'missing id' => array($this->mayaPayment(array('id' => '')), 150.5, '123', array('PAYMENT_SUCCESS')),
+            'missing amount' => array(array('id' => 'p1', 'status' => 'PAYMENT_SUCCESS', 'requestReferenceNumber' => '123'), 150.5, '123', array('PAYMENT_SUCCESS')),
+            'not an array' => array('PAYMENT_SUCCESS', 150.5, '123', array('PAYMENT_SUCCESS')),
+        );
+    }
 }

@@ -1033,6 +1033,15 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         } else {
             /** Process manual captures */
 
+            /** A failure webhook must never change an order that is already paid. */
+            if ($order->is_paid() && in_array($status, array('PAYMENT_EXPIRED', 'AUTH_FAILED', 'PAYMENT_FAILED'), true)) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Ignoring ' . $status . ' status for payment ' . $transactionRefNumber);
+                $order->add_order_note('Ignored failed payment ' . $transactionRefNumber . ' (' . $status . '): order is already paid');
+
+                status_header(204);
+                die();
+            }
+
             $payments = $this->client->getPaymentViaRrn($referenceNumber);
 
             if ($this->debug_mode) {
@@ -1071,7 +1080,19 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             $authorizedPayment = $authorizedPayments[0];
 
-            if ($authorizedPayment['amount'] === $authorizedPayment['capturedAmount']) {
+            /** Completion needs a PAYMENT_SUCCESS webhook AND Maya reporting this order's payment as fully captured for the order total. */
+            $isFullyCaptured = abs(floatval($authorizedPayment['amount']) - floatval($authorizedPayment['capturedAmount'])) < PHP_FLOAT_EPSILON;
+            $isConfirmedCapture = $status === 'PAYMENT_SUCCESS'
+                && $isFullyCaptured
+                && $this->is_payment_confirmed($authorizedPayment, $order, $referenceNumber, array('AUTHORIZED', 'CAPTURED', 'DONE'));
+
+            if ($status === 'PAYMENT_SUCCESS' && $isFullyCaptured && !$isConfirmedCapture) {
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook claimed success for order ' . $referenceNumber . ' but Maya\'s payment does not match the order reference or total. Order left unchanged.');
+                status_header(204);
+                die();
+            }
+
+            if ($isConfirmedCapture) {
                 if ($order->is_paid()) {
                     $order->update_status('processing');
                 } else {
@@ -1090,12 +1111,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     case 'PAYMENT_FAILED': {
                         $note = 'Failed payment ' . $payment['id'];
 
-                        /** A failure webhook must never downgrade an order that is already paid. */
-                        if ($order->is_paid()) {
-                            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Ignoring ' . $status . ' status change for payment ' . $payment['id']);
-                        } else {
-                            $order->update_status('on-hold');
-                        }
+                        $order->update_status('on-hold');
                         break;
                     }
                 }
@@ -1275,6 +1291,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     
 
     /**
+     * Whether a payment record from Maya belongs to this order, has an acceptable status and matches the order total.
+     * Every path that calls payment_complete() must pass this, so a webhook body alone never completes an order.
+     */
+    function is_payment_confirmed($maya, $order, $referenceNumber, array $allowedStatuses) {
+        return Cynder_Paymaya_Webhook_Guard::is_payment_confirmed($maya, floatval($order->get_total()), $referenceNumber, $allowedStatuses);
+    }
+
+    /**
      * Ask Maya for the order's payments and find a successful one matching the order reference and total.
      *
      * @return array|false|null The matching Maya payment, false if none matches, null if Maya could not be reached.
@@ -1287,15 +1311,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return null;
         }
 
-        $orderTotal = floatval($order->get_total());
-
         foreach ($payments as $maya) {
-            if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['requestReferenceNumber'])) continue;
-            if ($maya['status'] !== 'PAYMENT_SUCCESS') continue;
-            if (strval($maya['requestReferenceNumber']) !== strval($referenceNumber)) continue;
-            if (abs(floatval($maya['amount']) - $orderTotal) >= PHP_FLOAT_EPSILON) continue;
-
-            return $maya;
+            if ($this->is_payment_confirmed($maya, $order, $referenceNumber, array('PAYMENT_SUCCESS'))) {
+                return $maya;
+            }
         }
 
         return false;
