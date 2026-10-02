@@ -201,7 +201,7 @@ class Cynder_Paymaya_Webhook_Guard {
      * status and matches the order total. Every path that completes an order must pass this.
      */
     public static function is_payment_confirmed($maya, $orderTotal, $referenceNumber, array $allowedStatuses) {
-        if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['requestReferenceNumber'])) {
+        if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['requestReferenceNumber']) || !is_scalar($maya['amount']) || !is_numeric($maya['amount'])) {
             return false;
         }
 
