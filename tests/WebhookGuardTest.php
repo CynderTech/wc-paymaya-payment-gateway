@@ -44,8 +44,8 @@ class WebhookGuardTest extends TestCase {
         );
     }
 
-    /** openssl_verify() returns -1 on error (here: unusable key); that must never count as valid. */
-    public function test_openssl_error_is_not_treated_as_valid() {
+    /** An unusable key makes openssl_verify() error (-1 or false depending on PHP version); neither may count as valid. */
+    public function test_unusable_key_is_not_treated_as_valid() {
         $this->assertFalse(Cynder_Paymaya_Webhook_Guard::is_valid_signature('d', $this->sign('d'), array('not a key')));
     }
 
@@ -164,5 +164,39 @@ class WebhookGuardTest extends TestCase {
             'missing amount' => array(array('id' => 'p1', 'status' => 'PAYMENT_SUCCESS', 'currency' => 'PHP', 'requestReferenceNumber' => '123'), 150.5, 'PHP', '123', array('PAYMENT_SUCCESS')),
             'not an array' => array('PAYMENT_SUCCESS', 150.5, 'PHP', '123', array('PAYMENT_SUCCESS')),
         );
+    }
+
+    public function test_ipv4_mapped_ipv6_peer_is_unwrapped() {
+        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::resolve_source_ip(array('REMOTE_ADDR' => '::ffff:18.138.50.235')));
+        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::normalize_ip('0:0:0:0:0:ffff:128a:32eb'));
+        $this->assertSame('2001:db8::1', Cynder_Paymaya_Webhook_Guard::normalize_ip('2001:db8::1'));
+        $this->assertSame('garbage', Cynder_Paymaya_Webhook_Guard::normalize_ip('garbage'));
+    }
+
+    public function test_mapped_addresses_match_ipv4_ranges() {
+        $this->assertTrue(Cynder_Paymaya_Webhook_Guard::is_ip_in_cidr('::ffff:10.1.2.3', '10.0.0.0/8'));
+
+        $server = array('REMOTE_ADDR' => '::ffff:172.70.1.1', 'HTTP_CF_CONNECTING_IP' => '::ffff:18.138.50.235');
+        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server));
+
+        $server = array('REMOTE_ADDR' => '::ffff:10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '::ffff:3.1.207.200');
+        $this->assertSame('3.1.207.200', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    /** Cloudflare -> load balancer -> origin: the LB appends the Cloudflare edge IP to X-Forwarded-For. */
+    public function test_cloudflare_edge_behind_load_balancer_is_skipped_in_forwarded_chain() {
+        $server = array('REMOTE_ADDR' => '10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235, 172.70.1.1');
+        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', array('10.0.0.0/8')));
+    }
+
+    public function test_amounts_are_compared_to_the_cent() {
+        $this->assertTrue(Cynder_Paymaya_Webhook_Guard::amounts_equal(0.1 + 0.2, '0.30'));
+        $this->assertTrue(Cynder_Paymaya_Webhook_Guard::amounts_equal(150.5, '150.50'));
+        $this->assertFalse(Cynder_Paymaya_Webhook_Guard::amounts_equal(150.5, 150.51));
+    }
+
+    public function test_invalid_range_entries_are_reported() {
+        $this->assertSame(array('nonsense', '10.0.0.0/99'), Cynder_Paymaya_Webhook_Guard::invalid_range_entries("10.0.0.0/8\nnonsense, 10.0.0.0/99"));
+        $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::invalid_range_entries("10.0.0.0/8\n192.168.1.5"));
     }
 }

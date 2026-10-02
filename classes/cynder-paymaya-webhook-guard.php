@@ -63,13 +63,13 @@ class Cynder_Paymaya_Webhook_Guard {
      * @param array  $trustedRanges CIDR ranges of the merchant's proxies (see parse_ranges()).
      */
     public static function resolve_source_ip(array $server, $proxyHeader = '', array $trustedRanges = array()) {
-        $remote = isset($server['REMOTE_ADDR']) ? (string) $server['REMOTE_ADDR'] : '';
+        $remote = self::normalize_ip(isset($server['REMOTE_ADDR']) ? trim((string) $server['REMOTE_ADDR']) : '');
 
         if ($remote === '') {
             return '';
         }
 
-        $cf = isset($server['HTTP_CF_CONNECTING_IP']) ? trim((string) $server['HTTP_CF_CONNECTING_IP']) : '';
+        $cf = self::normalize_ip(isset($server['HTTP_CF_CONNECTING_IP']) ? trim((string) $server['HTTP_CF_CONNECTING_IP']) : '');
 
         if ($cf !== '' && filter_var($cf, FILTER_VALIDATE_IP) !== false && self::is_ip_in_ranges($remote, self::CLOUDFLARE_RANGES)) {
             return $cf;
@@ -80,20 +80,37 @@ class Cynder_Paymaya_Webhook_Guard {
             $value = isset($server[$serverKey]) ? (string) $server[$serverKey] : '';
 
             // Walk right to left: the right-most entry not added by a trusted proxy is the client.
+            // Cloudflare edges count as trusted hops too, so Cloudflare -> load balancer -> origin works.
             $hops = array_reverse(array_map('trim', explode(',', $value)));
 
             foreach ($hops as $hop) {
+                $hop = self::normalize_ip($hop);
+
                 if (filter_var($hop, FILTER_VALIDATE_IP) === false) {
                     break; // Garbage in the chain: stop trusting it.
                 }
 
-                if (!self::is_ip_in_ranges($hop, $trustedRanges)) {
+                if (!self::is_ip_in_ranges($hop, $trustedRanges) && !self::is_ip_in_ranges($hop, self::CLOUDFLARE_RANGES)) {
                     return $hop;
                 }
             }
         }
 
         return $remote;
+    }
+
+    /**
+     * Unwrap IPv4-mapped IPv6 addresses (::ffff:1.2.3.4), which dual-stack servers report in REMOTE_ADDR.
+     * Anything else (including invalid input) is returned unchanged.
+     */
+    public static function normalize_ip($ip) {
+        $packed = @inet_pton((string) $ip);
+
+        if ($packed !== false && strlen($packed) === 16 && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
+            return inet_ntop(substr($packed, 12));
+        }
+
+        return (string) $ip;
     }
 
     /**
@@ -104,23 +121,48 @@ class Cynder_Paymaya_Webhook_Guard {
         $ranges = array();
 
         foreach (preg_split('/[\s,]+/', (string) $text, -1, PREG_SPLIT_NO_EMPTY) as $entry) {
-            $parts = explode('/', $entry, 2);
-            $packed = @inet_pton($parts[0]);
+            $range = self::parse_range($entry);
 
-            if ($packed === false) {
-                continue;
-            }
-
-            $maxBits = strlen($packed) * 8;
-
-            if (count($parts) === 1) {
-                $ranges[] = $parts[0] . '/' . $maxBits;
-            } elseif (ctype_digit($parts[1]) && (int) $parts[1] <= $maxBits) {
-                $ranges[] = $parts[0] . '/' . (int) $parts[1];
+            if ($range !== null) {
+                $ranges[] = $range;
             }
         }
 
         return $ranges;
+    }
+
+    /** Entries of a merchant-entered list that parse_ranges() would drop. */
+    public static function invalid_range_entries($text) {
+        $invalid = array();
+
+        foreach (preg_split('/[\s,]+/', (string) $text, -1, PREG_SPLIT_NO_EMPTY) as $entry) {
+            if (self::parse_range($entry) === null) {
+                $invalid[] = $entry;
+            }
+        }
+
+        return $invalid;
+    }
+
+    private static function parse_range($entry) {
+        $parts = explode('/', $entry, 2);
+        $packed = @inet_pton($parts[0]);
+
+        if ($packed === false) {
+            return null;
+        }
+
+        $maxBits = strlen($packed) * 8;
+
+        if (count($parts) === 1) {
+            return $parts[0] . '/' . $maxBits;
+        }
+
+        if (ctype_digit($parts[1]) && (int) $parts[1] <= $maxBits) {
+            return $parts[0] . '/' . (int) $parts[1];
+        }
+
+        return null;
     }
 
     public static function is_ip_in_ranges($ip, array $ranges) {
@@ -140,7 +182,7 @@ class Cynder_Paymaya_Webhook_Guard {
 
         list($subnet, $bits) = explode('/', $cidr, 2);
 
-        $ipBin = @inet_pton($ip);
+        $ipBin = @inet_pton(self::normalize_ip($ip));
         $subnetBin = @inet_pton($subnet);
 
         // Different families (or invalid input) never match.
@@ -152,11 +194,10 @@ class Cynder_Paymaya_Webhook_Guard {
             return false;
         }
 
-
         $bits = (int) $bits;
         $maxBits = strlen($ipBin) * 8;
 
-        if ($bits < 0 || $bits > $maxBits) {
+        if ($bits > $maxBits) {
             return false;
         }
 
@@ -222,6 +263,11 @@ class Cynder_Paymaya_Webhook_Guard {
             return false;
         }
 
-        return abs(floatval($maya['amount']) - floatval($orderTotal)) < PHP_FLOAT_EPSILON;
+        return self::amounts_equal($maya['amount'], $orderTotal);
+    }
+
+    /** Money comparison to the cent; PHP_FLOAT_EPSILON would amount to exact float equality at these magnitudes. */
+    public static function amounts_equal($a, $b) {
+        return (int) round(floatval($a) * 100) === (int) round(floatval($b) * 100);
     }
 }

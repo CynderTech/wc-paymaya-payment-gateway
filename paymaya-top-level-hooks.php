@@ -363,3 +363,6 @@ function update_paymaya_plugin() {
 }
 
 add_action('woocommerce_paymaya_updated', 'update_paymaya_plugin');
+
+/** Registered once here rather than in the gateway constructor, which WooCommerce instantiates lazily. */
+add_action('admin_notices', array('Cynder_Paymaya_Gateway', 'webhook_source_rejected_notice'));
