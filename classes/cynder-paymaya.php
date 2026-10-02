@@ -1051,14 +1051,18 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
             }
 
-            if (array_key_exists("error", $payments)) {
-                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] ' . $payments['error']);
-                return;
+            /** Retryable: Maya could not be reached or errored, so nothing was confirmed either way. */
+            if (!is_array($payments) || array_key_exists("error", $payments)) {
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] ' . (is_array($payments) ? $payments['error'] : 'Unexpected response when looking up payments for order ' . $referenceNumber));
+                status_header(503);
+                die();
             }
 
+            /** Not retryable: Maya answered and has no matching payment. */
             if (count($payments) === 0) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] No payments associated to order ID ' . $referenceNumber);
-                return;
+                status_header(204);
+                die();
             }
 
             $authorizedPayments = array_values(
@@ -1073,12 +1077,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             if (count($authorizedPayments) === 0) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] No captured payments associated to order ID ' . $referenceNumber);
-                return;
+                status_header(204);
+                die();
             }
 
             if (count($authorizedPayments) > 2) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Multiple captured payments associated to order ID ' . $referenceNumber);
-                return;
+                status_header(204);
+                die();
             }
 
             $authorizedPayment = $authorizedPayments[0];
@@ -1090,7 +1096,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 && $this->is_payment_confirmed($authorizedPayment, $order, $referenceNumber, array('AUTHORIZED', 'CAPTURED', 'DONE'));
 
             if ($status === 'PAYMENT_SUCCESS' && $isFullyCaptured && !$isConfirmedCapture) {
-                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook claimed success for order ' . $referenceNumber . ' but Maya\'s payment does not match the order reference or total. Order left unchanged.');
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook claimed success for order ' . $referenceNumber . ' but Maya\'s payment does not match the order reference, total or currency. Order left unchanged.');
                 status_header(204);
                 die();
             }
@@ -1298,7 +1304,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
      * Every path that calls payment_complete() must pass this, so a webhook body alone never completes an order.
      */
     function is_payment_confirmed($maya, $order, $referenceNumber, array $allowedStatuses) {
-        return Cynder_Paymaya_Webhook_Guard::is_payment_confirmed($maya, floatval($order->get_total()), $referenceNumber, $allowedStatuses);
+        return Cynder_Paymaya_Webhook_Guard::is_payment_confirmed($maya, floatval($order->get_total()), $order->get_currency(), $referenceNumber, $allowedStatuses);
     }
 
     /**

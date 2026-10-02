@@ -203,10 +203,10 @@ class Cynder_Paymaya_Webhook_Guard {
 
     /**
      * Whether a payment record returned by Maya belongs to the order (same reference), has an acceptable
-     * status and matches the order total. Every path that completes an order must pass this.
+     * status and matches the order total and currency. Every path that completes an order must pass this.
      */
-    public static function is_payment_confirmed($maya, $orderTotal, $referenceNumber, array $allowedStatuses) {
-        if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['requestReferenceNumber']) || !is_scalar($maya['amount']) || !is_numeric($maya['amount'])) {
+    public static function is_payment_confirmed($maya, $orderTotal, $orderCurrency, $referenceNumber, array $allowedStatuses) {
+        if (!is_array($maya) || empty($maya['id']) || !isset($maya['status'], $maya['amount'], $maya['currency'], $maya['requestReferenceNumber']) || !is_scalar($maya['amount']) || !is_numeric($maya['amount'])) {
             return false;
         }
 
@@ -215,6 +215,10 @@ class Cynder_Paymaya_Webhook_Guard {
         }
 
         if (strval($maya['requestReferenceNumber']) !== strval($referenceNumber)) {
+            return false;
+        }
+
+        if (!is_scalar($maya['currency']) || strcasecmp(strval($maya['currency']), strval($orderCurrency)) !== 0) {
             return false;
         }
 
