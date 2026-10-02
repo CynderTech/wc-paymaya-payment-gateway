@@ -1024,7 +1024,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     case 'AUTH_FAILED':
                     case 'PAYMENT_FAILED': {
                         $note = 'Failed payment ' . $payment['id'];
-                        $order->update_status('on-hold');
+
+                        /** A failure webhook must never downgrade an order that is already paid. */
+                        if ($order->is_paid()) {
+                            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Ignoring ' . $status . ' status change for payment ' . $payment['id']);
+                        } else {
+                            $order->update_status('on-hold');
+                        }
                         break;
                     }
                 }
