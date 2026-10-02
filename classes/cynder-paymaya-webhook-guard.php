@@ -144,6 +144,11 @@ class Cynder_Paymaya_Webhook_Guard {
         return $invalid;
     }
 
+    /**
+     * Canonical CIDR for one entry, or null if invalid. IPv4-mapped IPv6 entries (::ffff:a.b.c.d/n) are
+     * translated to IPv4 (n - 96), matching resolve_source_ip(), which unwraps mapped addresses. A mapped
+     * address with a prefix shorter than 96 bits is ambiguous (it spans non-IPv4 space) and is rejected.
+     */
     private static function parse_range($entry) {
         $parts = explode('/', $entry, 2);
         $packed = @inet_pton($parts[0]);
@@ -155,14 +160,18 @@ class Cynder_Paymaya_Webhook_Guard {
         $maxBits = strlen($packed) * 8;
 
         if (count($parts) === 1) {
-            return $parts[0] . '/' . $maxBits;
+            $bits = $maxBits;
+        } elseif (ctype_digit($parts[1]) && (int) $parts[1] <= $maxBits) {
+            $bits = (int) $parts[1];
+        } else {
+            return null;
         }
 
-        if (ctype_digit($parts[1]) && (int) $parts[1] <= $maxBits) {
-            return $parts[0] . '/' . (int) $parts[1];
+        if (strlen($packed) === 16 && self::normalize_ip($parts[0]) !== $parts[0] && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
+            return $bits >= 96 ? inet_ntop(substr($packed, 12)) . '/' . ($bits - 96) : null;
         }
 
-        return null;
+        return $parts[0] . '/' . $bits;
     }
 
     public static function is_ip_in_ranges($ip, array $ranges) {

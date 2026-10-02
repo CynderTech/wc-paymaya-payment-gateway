@@ -199,4 +199,21 @@ class WebhookGuardTest extends TestCase {
         $this->assertSame(array('nonsense', '10.0.0.0/99'), Cynder_Paymaya_Webhook_Guard::invalid_range_entries("10.0.0.0/8\nnonsense, 10.0.0.0/99"));
         $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::invalid_range_entries("10.0.0.0/8\n192.168.1.5"));
     }
+
+    public function test_ipv4_mapped_ranges_are_canonicalized_to_ipv4() {
+        $this->assertSame(array('10.0.0.5/32'), Cynder_Paymaya_Webhook_Guard::parse_ranges('::ffff:10.0.0.5'));
+        $this->assertSame(array('10.0.0.0/8'), Cynder_Paymaya_Webhook_Guard::parse_ranges('::ffff:10.0.0.0/104'));
+        $this->assertSame(array('10.1.2.3/32'), Cynder_Paymaya_Webhook_Guard::parse_ranges('0:0:0:0:0:ffff:a01:203/128'));
+        // Prefix shorter than 96 spans non-IPv4 space: ambiguous, rejected and reported.
+        $this->assertSame(array(), Cynder_Paymaya_Webhook_Guard::parse_ranges('::ffff:10.0.0.0/64'));
+        $this->assertSame(array('::ffff:10.0.0.0/64'), Cynder_Paymaya_Webhook_Guard::invalid_range_entries('::ffff:10.0.0.0/64'));
+        // Real IPv6 ranges are untouched.
+        $this->assertSame(array('2001:db8::/32', '::/0'), Cynder_Paymaya_Webhook_Guard::parse_ranges("2001:db8::/32\n::/0"));
+    }
+
+    public function test_configured_mapped_proxy_matches_mapped_peer() {
+        $ranges = Cynder_Paymaya_Webhook_Guard::parse_ranges('::ffff:10.0.0.5');
+        $server = array('REMOTE_ADDR' => '::ffff:10.0.0.5', 'HTTP_X_FORWARDED_FOR' => '18.138.50.235');
+        $this->assertSame('18.138.50.235', Cynder_Paymaya_Webhook_Guard::resolve_source_ip($server, 'x-forwarded-for', $ranges));
+    }
 }

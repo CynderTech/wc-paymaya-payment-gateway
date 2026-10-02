@@ -127,6 +127,13 @@ class Cynder_PaymayaClient {
 
         $decodedResponse = $this->handleResponse($response);
 
+        /** An empty or non-JSON body decodes to null (or a scalar); report it as an error instead of inspecting it as an array. */
+        if (!is_array($decodedResponse)) {
+            return array(
+                'error' => 'Unexpected or empty response when requesting payments via RRN.'
+            );
+        }
+
         if (array_key_exists('error', $decodedResponse) && is_array($decodedResponse['error'])) {
             if (array_key_exists('message', $decodedResponse['error'])) {
                 return array(
