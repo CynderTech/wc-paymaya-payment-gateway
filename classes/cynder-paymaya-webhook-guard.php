@@ -303,4 +303,91 @@ class Cynder_Paymaya_Webhook_Guard {
     public static function amounts_equal($a, $b) {
         return (int) round(floatval($a) * 100) === (int) round(floatval($b) * 100);
     }
+
+    /** The webhook body must carry the keys the handler reads; anything else is a 400. */
+    public static function is_valid_webhook_payload($payload) {
+        return is_array($payload) && isset($payload['requestReferenceNumber'], $payload['id'], $payload['status'], $payload['amount']);
+    }
+
+    /**
+     * Classify Maya's answer to "payments for this reference" for a normal (non-manual-capture) order.
+     *
+     * @return array [outcome, payment|null]. outcome: 'unreachable' (error/malformed body, retry),
+     *               'no_match' (Maya answered, nothing matches) or 'match'.
+     */
+    public static function classify_lookup($payments, $orderTotal, $orderCurrency, $referenceNumber, array $allowedStatuses) {
+        if (!is_array($payments) || array_key_exists('error', $payments)) {
+            return array('unreachable', null);
+        }
+
+        foreach ($payments as $maya) {
+            if (self::is_payment_confirmed($maya, $orderTotal, $orderCurrency, $referenceNumber, $allowedStatuses)) {
+                return array('match', $maya);
+            }
+        }
+
+        return array('no_match', null);
+    }
+
+    /**
+     * Classify a manual-capture (authorize/capture) webhook against Maya's payments for the reference.
+     *
+     * Outcomes: 'unreachable' (retry), 'none' (no payments / no authorization record at Maya yet),
+     * 'complete' (the single confirmed, fully captured payment, returned), 'mismatch' (a fully captured
+     * record exists but is not this order's payment: final), 'ambiguous' (several confirmed fully captured
+     * payments: never guessed), 'pending' (nothing to complete: partial capture, authorization only, or a
+     * non-success webhook).
+     *
+     * Several authorization records are normal when a customer retried checkout; only confirmed ones
+     * (right reference, total, currency, live status) count, so a failed earlier attempt is ignored.
+     *
+     * @return array [outcome, payment|null]
+     */
+    public static function classify_manual_capture($payments, $orderTotal, $orderCurrency, $referenceNumber, $webhookStatus) {
+        if (!is_array($payments) || array_key_exists('error', $payments)) {
+            return array('unreachable', null);
+        }
+
+        $authorized = array();
+
+        foreach ($payments as $maya) {
+            if (is_array($maya) && !empty($maya['receiptNumber']) && !empty($maya['requestReferenceNumber']) && array_key_exists('authorizationType', $maya)) {
+                $authorized[] = $maya;
+            }
+        }
+
+        if (count($authorized) === 0) {
+            return array('none', null);
+        }
+
+        if ($webhookStatus !== 'PAYMENT_SUCCESS') {
+            return array('pending', null);
+        }
+
+        $fullyCaptured = array();
+
+        foreach ($authorized as $maya) {
+            if (isset($maya['amount'], $maya['capturedAmount']) && self::amounts_equal($maya['amount'], $maya['capturedAmount'])) {
+                $fullyCaptured[] = $maya;
+            }
+        }
+
+        if (count($fullyCaptured) === 0) {
+            return array('pending', null);
+        }
+
+        $confirmed = array();
+
+        foreach ($fullyCaptured as $maya) {
+            if (self::is_payment_confirmed($maya, $orderTotal, $orderCurrency, $referenceNumber, array('AUTHORIZED', 'CAPTURED', 'DONE'))) {
+                $confirmed[] = $maya;
+            }
+        }
+
+        if (count($confirmed) === 1) {
+            return array('complete', $confirmed[0]);
+        }
+
+        return array(count($confirmed) > 1 ? 'ambiguous' : 'mismatch', null);
+    }
 }
