@@ -838,6 +838,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $requestBody = file_get_contents('php://input');
         $payment = json_decode($requestBody, true);
 
+        if (!is_array($payment)) {
+            return false;
+        }
+
         if (!$this->verify_signature_v1($payment, $webhookV1, $webhookNonce)) {
             if ($this->debug_mode) {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Webhook signature mismatch');
@@ -892,6 +896,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payment Webhook payload ' . wc_print_r($payment, true));
+        }
+
+        if (!is_array($payment) || !isset($payment['requestReferenceNumber'], $payment['id'], $payment['status'], $payment['amount'])) {
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Malformed webhook payload');
+
+            status_header(400);
+            die();
         }
 
         $referenceNumber = $payment['requestReferenceNumber'];
