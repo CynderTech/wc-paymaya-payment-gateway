@@ -148,6 +148,11 @@ class Cynder_Paymaya_Webhook_Guard {
             return false;
         }
 
+        if (!ctype_digit($bits)) {
+            return false;
+        }
+
+
         $bits = (int) $bits;
         $maxBits = strlen($ipBin) * 8;
 
