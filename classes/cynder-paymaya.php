@@ -769,22 +769,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function get_source() {
-        $ip = '';
-        
-        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) $ip = $_SERVER['HTTP_CF_CONNECTING_IP'];
-        elseif (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-        elseif (isset($_SERVER['HTTP_X_FORWARDED_BY'])) $ip = $_SERVER['HTTP_X_FORWARDED_BY'];
-        elseif (isset($_SERVER['HTTP_X_CLIENT_IP'])) $ip = $_SERVER['HTTP_X_CLIENT_IP'];
-        elseif (isset($_SERVER['HTTP_CLIENT_IP'])) $ip = $_SERVER['HTTP_CLIENT_IP'];
-        elseif (isset($_SERVER['REMOTE_ADDR'])) $ip = $_SERVER['REMOTE_ADDR'];
+        // Only the connection's address is trustworthy; forwarding headers are client-controlled.
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
 
-        // If multiple IPs are chained (like via ngrok), grab the first one (the original sender)
-        if (strpos($ip, ',') !== false) {
-            $ips = explode(',', $ip);
-            $ip = trim($ips[0]);
-        }
-
-        return $ip;
+        /**
+         * Merchants behind a trusted proxy/CDN (e.g. Cloudflare) can resolve the real client IP here,
+         * e.g. from CF-Connecting-IP, but only if the origin accepts traffic from that proxy alone.
+         */
+        return (string) apply_filters('cynder_paymaya_webhook_source_ip', $ip);
     }
 
     function is_valid_source($source) {
