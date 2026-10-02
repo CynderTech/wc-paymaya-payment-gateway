@@ -1197,8 +1197,13 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     
 
     function array_some($data, $callback) {
-        $result = array_filter($data, $callback);
-        return count($result) > 0;
+        foreach ($data as $item) {
+            if ($callback($item) === true) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     function verify_signature_v1($payload, $signature, $nonce) {
@@ -1224,8 +1229,16 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION;
         }
 
-        return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $signature) {
-            return openssl_verify($verifyString, hex2bin($signature), $publicKey, "sha256WithRSAEncryption") === 1;
+        $binarySignature = (is_string($signature) && ctype_xdigit($signature) && strlen($signature) % 2 === 0)
+            ? hex2bin($signature)
+            : false;
+
+        if ($binarySignature === false) {
+            return false;
+        }
+
+        return $this->array_some($publicKeys, function($publicKey) use ($verifyString, $binarySignature) {
+            return openssl_verify($verifyString, $binarySignature, $publicKey, "sha256WithRSAEncryption") === 1;
         });
     }
     
