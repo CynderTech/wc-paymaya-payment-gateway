@@ -336,7 +336,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     public function process_admin_options() {
         $is_options_saved = parent::process_admin_options();
-        delete_option(self::SOURCE_REJECTED_OPTION);
+
+        if ($is_options_saved) {
+            delete_option(self::SOURCE_REJECTED_OPTION);
+        }
 
         $webhookSuccessUrl = $this->get_option('webhook_success');
         $webhookFailureUrl = $this->get_option('webhook_failure');
