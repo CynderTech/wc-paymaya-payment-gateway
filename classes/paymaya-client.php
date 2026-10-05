@@ -146,7 +146,7 @@ class Cynder_PaymayaClient {
                 );
             } else {
                 return array(
-                    'error' => 'Something went wrong when requesting payments via RRN. Please check response. ' . wc_print_r($decodedResponse['error']),
+                    'error' => 'Something went wrong when requesting payments via RRN. Please check response. ' . wc_print_r($decodedResponse['error'], true),
                 );
             }
         }

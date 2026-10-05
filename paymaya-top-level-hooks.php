@@ -53,7 +53,14 @@ function cynder_paymaya_scripts($hook) {
     }
 
     if (array_key_exists('error', $payments)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_LOADING_ADMIN_JS_SCRIPTS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+        $errorString = is_array($payments['error']) ? wp_json_encode($payments['error']) : (string) $payments['error'];
+        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_LOADING_ADMIN_JS_SCRIPTS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $errorString);
+        
+        // Push the error to the top of the admin page
+        add_action('admin_notices', function() use ($errorString) {
+            echo '<div class="notice notice-error is-dismissible"><p><strong>Maya Gateway Error:</strong> ' . esc_html($errorString) . '</p></div>';
+        });
+        
         return;
     }
 
