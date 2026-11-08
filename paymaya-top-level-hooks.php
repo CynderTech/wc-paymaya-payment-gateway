@@ -370,6 +370,12 @@ function update_paymaya_plugin() {
     if (array_key_exists("error", $createdWebhook)) {
         wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhooks ' . wc_print_r($createdWebhook['error'], true));
     }
+
+    $createdWebhook = $client->createWebhook('PAYMENT_CANCELLED', $webhookUrl);
+
+    if (array_key_exists("error", $createdWebhook)) {
+        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhooks ' . wc_print_r($createdWebhook['error'], true));
+    }
 }
 
 add_action('woocommerce_paymaya_updated', 'update_paymaya_plugin');

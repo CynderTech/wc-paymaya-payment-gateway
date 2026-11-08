@@ -36,6 +36,7 @@ define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array(
     'PAYMENT_SUCCESS',
     'PAYMENT_FAILED',
     'PAYMENT_EXPIRED',
+    'PAYMENT_CANCELLED',
 ));
 
 define('MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX', array(
@@ -502,6 +503,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     
                 $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
     
+                if (array_key_exists("error", $createdWebhook)) {
+                    $this->process_error($createdWebhook);
+                }
+
+                $createdWebhook = $this->client->createWebhook('PAYMENT_CANCELLED', $webhookPaymentUrl);
+
                 if (array_key_exists("error", $createdWebhook)) {
                     $this->process_error($createdWebhook);
                 }
@@ -1127,12 +1134,16 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 }
 
                 $order->payment_complete($confirmedPayment['id']);
-            } else if ($status === 'PAYMENT_FAILED' || $status === 'PAYMENT_EXPIRED' || $status === 'AUTH_FAILED') {
+            } else if ($status === 'PAYMENT_FAILED' || $status === 'PAYMENT_EXPIRED' || $status === 'PAYMENT_CANCELLED' || $status === 'AUTH_FAILED') {
                 $note = '';
 
                 switch ($status) {
                     case 'PAYMENT_EXPIRED': {
                         $note = 'Payment expired';
+                        break;
+                    }
+                    case 'PAYMENT_CANCELLED': {
+                        $note = 'Payment cancelled';
                         break;
                     }
                     case 'AUTH_FAILED':
@@ -1150,7 +1161,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             /** Process manual captures */
 
             /** A failure webhook must never change an order that is already paid. */
-            if ($order->is_paid() && in_array($status, array('PAYMENT_EXPIRED', 'AUTH_FAILED', 'PAYMENT_FAILED'), true)) {
+            if ($order->is_paid() && in_array($status, array('PAYMENT_EXPIRED', 'PAYMENT_CANCELLED', 'AUTH_FAILED', 'PAYMENT_FAILED'), true)) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Ignoring ' . $status . ' status for payment ' . $transactionRefNumber);
                 $order->add_order_note('Ignored failed payment ' . $transactionRefNumber . ' (' . $status . '): order is already paid');
 
@@ -1218,6 +1229,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                         break;
                     }
                     case 'PAYMENT_EXPIRED':
+                    case 'PAYMENT_CANCELLED':
                     case 'AUTH_FAILED':
                     case 'PAYMENT_FAILED': {
                         $note = 'Failed payment ' . $payment['id'];
