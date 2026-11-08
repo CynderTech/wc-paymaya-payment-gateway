@@ -1133,7 +1133,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if (empty($authorizationType) || $authorizationType === 'none') {
             /** For non-manual capture payments: */
 
-            list($failureAction, $failureNote) = Cynder_Paymaya_Webhook_Guard::failure_decision($status, false, false);
+            list($failureAction, $failureNote) = Cynder_Paymaya_Webhook_Guard::failure_decision($status, $order->is_paid(), false);
 
             if ($order->is_paid()) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Cannot process payment ' . $transactionRefNumber . ' with ' . $status . ' status.');
