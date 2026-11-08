@@ -30,7 +30,7 @@ class ClientResponseTest extends TestCase {
         $this->assertArrayHasKey('error', $result);
     }
 
-    public function unusableBodies() {
+    public static function unusableBodies() {
         return array(
             'empty' => array(''),
             'html from a proxy or waf' => array('<html><body>Blocked</body></html>'),

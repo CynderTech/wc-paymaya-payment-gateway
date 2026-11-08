@@ -8,7 +8,7 @@ class ErrorMessageTest extends TestCase {
         $this->assertSame($expected, Cynder_Paymaya_Webhook_Guard::error_message($response));
     }
 
-    public function shapes() {
+    public static function shapes() {
         return array(
             'string from a transport failure' => array(array('error' => 'cURL error 28: timed out'), 'cURL error 28: timed out'),
             'object with message' => array(array('error' => array('message' => 'Invalid key')), 'Invalid key'),

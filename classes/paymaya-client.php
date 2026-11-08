@@ -1,6 +1,6 @@
 <?php
 
-if (!defined('ABSPATH') && !defined('CYNDER_PAYMAYA_TESTING')) {
+if (!defined('ABSPATH')) {
     exit;
 }
 

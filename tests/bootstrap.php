@@ -1,6 +1,11 @@
 <?php
 define('CYNDER_PAYMAYA_TESTING', true);
 
+/** The production files exit when loaded outside WordPress; the tests stand in for it. */
+if (!defined('ABSPATH')) {
+    define('ABSPATH', __DIR__ . '/');
+}
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../classes/cynder-paymaya-webhook-guard.php';
 
