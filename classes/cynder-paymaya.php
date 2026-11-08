@@ -930,9 +930,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return false;
         }
 
-        $mayaIps = $this->sandbox === 'yes'
-            ? array('13.229.160.234', '3.1.199.75')
-            : array('18.138.50.235', '3.1.207.200');
+        /** Sandbox skips the IP allowlist (tunnels and local dev hide the sender IP); timestamp and signature are still enforced above. */
+        if ($this->sandbox === 'yes') {
+            return true;
+        }
+
+        $mayaIps = array('18.138.50.235', '3.1.207.200');
 
         if (!in_array($source, $mayaIps, true)) {
             /** Reached only after the signature verified, so Maya signed this request but it came from an unexpected IP. */
