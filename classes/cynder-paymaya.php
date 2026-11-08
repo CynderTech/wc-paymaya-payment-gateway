@@ -689,6 +689,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             /** Reference numbers are just order ids, so prefer the payment this order recorded when it was paid. */
             $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
+
+            if ($successfulPayment === null) {
+                return new WP_Error(404, 'This order\'s recorded payment was not found at Maya, so nothing was refunded. Check the payment on the Maya dashboard.');
+            }
     
             if ($this->debug_mode) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Successful Payment ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($successfulPayment), true));
@@ -754,6 +758,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             }
 
             $authorizedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedPayments, $order->get_transaction_id());
+
+            if ($authorizedPayment === null) {
+                return new WP_Error(404, 'This order\'s recorded payment was not found at Maya, so nothing was refunded. Check the payment on the Maya dashboard.');
+            }
 
             /**
              * If there are no other payments other than the authorized payment,
@@ -1281,8 +1289,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             )
         );
     
-        if (count($successfulPayments) !== 0) {
-            $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
+        $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
+
+        if ($successfulPayment !== null) {
         
             if ($this->debug_mode) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payment ID ' . $successfulPayment['id'] . ' canRefund: ' . ($successfulPayment['canRefund'] == true ? 'true' : 'false'));

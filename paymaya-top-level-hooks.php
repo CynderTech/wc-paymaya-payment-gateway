@@ -195,7 +195,16 @@ function cynder_paymaya_capture_payment() {
         );
     }
 
-    $authorizedPayment = $authorizedPayments[0];
+    /** Same selection as refund and void: the payment this order recorded, never a look-alike from another site. */
+    $authorizedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedPayments, $order->get_transaction_id());
+
+    if ($authorizedPayment === null) {
+        return wp_send_json(
+            array('error' => 'This order\'s recorded payment was not found at Maya'),
+            400
+        );
+    }
+
     $currency = $order->get_currency();
 
     $payload = json_encode(
