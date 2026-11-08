@@ -128,18 +128,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         $this->init_settings();
 
-        $this->enabled = $this->get_option('enabled');
-        $this->title = $this->get_option('title');
-        $this->description = $this->get_option('description');
-        $this->manual_capture = $this->get_option('manual_capture');
-        $this->sandbox = $this->get_option('sandbox');
-        $this->secret_key = $this->get_option('secret_key');
-        $this->public_key = $this->get_option('public_key');
-        $this->webhook_success = $this->get_option('webhook_success');
-        $this->webhook_failure = $this->get_option('webhook_failure');
-        
-        $debugMode = $this->get_option('debug_mode');
-        $this->debug_mode = !empty($debugMode) && $debugMode === 'yes';
+        $this->load_settings();
 
         add_action(
             'woocommerce_update_options_payment_gateways_' . $this->id,
@@ -172,8 +161,42 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'woocommerce_admin_order_data_after_shipping_address',
             array($this, 'wc_paymaya_webhook_labels')
         );
+    }
+
+    /**
+     * Read settings into properties and build the API client. Called again after the settings are saved,
+     * so webhooks are registered with the keys just entered rather than the previous ones.
+     */
+    private function load_settings() {
+        $this->enabled = $this->get_option('enabled');
+        $this->title = $this->get_option('title');
+        $this->description = $this->get_option('description');
+        $this->manual_capture = $this->get_option('manual_capture');
+        $this->sandbox = $this->get_option('sandbox');
+        $this->webhook_success = $this->get_option('webhook_success');
+        $this->webhook_failure = $this->get_option('webhook_failure');
+
+        list($this->public_key, $this->secret_key) = self::get_api_keys($this->settings);
+
+        $debugMode = $this->get_option('debug_mode');
+        $this->debug_mode = !empty($debugMode) && $debugMode === 'yes';
 
         $this->client = new Cynder_PaymayaClient($this->sandbox === 'yes', $this->public_key, $this->secret_key);
+    }
+
+    /**
+     * API keys to use: the CYNDER_PAYMAYA_PUBLIC_KEY / CYNDER_PAYMAYA_SECRET_KEY constants when defined
+     * (e.g. in wp-config.php, keeping the secret out of the database), otherwise the saved settings.
+     *
+     * @return array [public key, secret key]
+     */
+    public static function get_api_keys($settings) {
+        $settings = is_array($settings) ? $settings : array();
+
+        $publicKey = defined('CYNDER_PAYMAYA_PUBLIC_KEY') ? (string) CYNDER_PAYMAYA_PUBLIC_KEY : (isset($settings['public_key']) ? (string) $settings['public_key'] : '');
+        $secretKey = defined('CYNDER_PAYMAYA_SECRET_KEY') ? (string) CYNDER_PAYMAYA_SECRET_KEY : (isset($settings['secret_key']) ? (string) $settings['secret_key'] : '');
+
+        return array($publicKey, $secretKey);
     }
 
     /**
@@ -232,11 +255,15 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             ),
             'public_key' => array(
                 'title'       => 'Public Key',
-                'type'        => 'text',
+                'type'        => 'maya_key',
+                'constant'    => 'CYNDER_PAYMAYA_PUBLIC_KEY',
             ),
             'secret_key' => array(
                 'title'       => 'Secret Key',
-                'type'        => 'text'
+                'type'        => 'maya_key',
+                'constant'    => 'CYNDER_PAYMAYA_SECRET_KEY',
+                'secret'      => true,
+                'description' => 'Stored in the database unless set in wp-config.php with <code>define(\'CYNDER_PAYMAYA_SECRET_KEY\', \'...\');</code> (recommended). The saved key is never shown; leave this blank to keep it.',
             ),
             'webhook_title' => array(
                 'title' => 'Webhooks',
@@ -336,6 +363,65 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
     }
 
+    /**
+     * API key field. Locked when the key comes from a wp-config.php constant. A secret field is masked and never
+     * echoes the saved value back into the page; it shows only the last 4 characters as a hint.
+     */
+    public function generate_maya_key_html($key, $data) {
+        $data = wp_parse_args($data, array('title' => '', 'description' => '', 'desc_tip' => false));
+        $fieldKey = $this->get_field_key($key);
+        $constant = isset($data['constant']) ? $data['constant'] : '';
+        $isSecret = !empty($data['secret']);
+        $fromConstant = $constant !== '' && defined($constant);
+        $saved = (string) $this->get_option($key);
+
+        $value = $isSecret ? '' : $saved;
+        $placeholder = '';
+
+        if ($fromConstant) {
+            $value = '';
+            $placeholder = 'Set in wp-config.php (' . $constant . ')';
+        } elseif ($isSecret && $saved !== '') {
+            $placeholder = 'Saved key ending in ' . substr($saved, -4) . '. Leave blank to keep it.';
+        }
+
+        ob_start();
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr($fieldKey); ?>"><?php echo wp_kses_post($data['title']); ?></label>
+            </th>
+            <td class="forminp">
+                <fieldset>
+                    <legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
+                    <input class="input-text regular-input" type="<?php echo $isSecret ? 'password' : 'text'; ?>" name="<?php echo esc_attr($fieldKey); ?>" id="<?php echo esc_attr($fieldKey); ?>" value="<?php echo esc_attr($value); ?>" placeholder="<?php echo esc_attr($placeholder); ?>" autocomplete="off" <?php disabled($fromConstant, true); ?> />
+                    <?php echo $this->get_description_html($data); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                </fieldset>
+            </td>
+        </tr>
+        <?php
+
+        return ob_get_clean();
+    }
+
+    /** Keys set by constant are not overwritten, and a blank secret keeps the saved one. */
+    public function validate_maya_key_field($key, $value) {
+        $field = isset($this->form_fields[$key]) ? $this->form_fields[$key] : array();
+        $saved = (string) $this->get_option($key);
+
+        if (!empty($field['constant']) && defined($field['constant'])) {
+            return $saved;
+        }
+
+        $value = is_null($value) ? '' : trim(sanitize_text_field(wp_unslash($value)));
+
+        if ($value === '' && !empty($field['secret'])) {
+            return $saved;
+        }
+
+        return $value;
+    }
+
     /** Keep only valid IPs/CIDRs and tell the merchant about the rest, instead of silently ignoring them. */
     public function validate_trusted_proxy_ips_field($key, $value) {
         $value = is_null($value) ? '' : wp_unslash($value);
@@ -361,11 +447,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             delete_option(self::SOURCE_REJECTED_OPTION);
         }
 
+        /** The gateway was built before the save; pick up the new values (keys, sandbox) before calling Maya. */
+        $this->load_settings();
+
         $webhookSuccessUrl = $this->get_option('webhook_success');
         $webhookFailureUrl = $this->get_option('webhook_failure');
         $webhookPaymentUrl = $this->get_option('webhook_payment_status');
 
-        if (isset($this->enabled) && $this->enabled === 'yes' && isset($this->public_key) && isset($this->secret_key)) {
+        if ($this->enabled === 'yes' && $this->public_key !== '' && $this->secret_key !== '') {
             $webhooks = $this->client->retrieveWebhooks();
 
             if (array_key_exists("error", $webhooks)) {

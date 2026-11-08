@@ -40,11 +40,8 @@ function cynder_paymaya_scripts($hook) {
     /** If order isn't made with manual capture, don't load JS scripts */
     if (empty($authorizationType) || $authorizationType === 'none') return;
 
-    $isSandbox = $paymayaGateway->get_option('sandbox');
-    $secretKey = $paymayaGateway->get_option('secret_key');
-    $publicKey = $paymayaGateway->get_option('public_key');
-
-    $client = new Cynder_PaymayaClient($isSandbox === 'yes', $publicKey, $secretKey);
+    /** The gateway's client already holds the keys, including ones set by wp-config.php constants. */
+    $client = $paymayaGateway->client;
 
     $payments = $client->getPaymentViaRrn($orderId);
 
@@ -153,11 +150,8 @@ function cynder_paymaya_capture_payment() {
         );
     }
 
-    $isSandbox = $paymayaGateway->get_option('sandbox');
-    $secretKey = $paymayaGateway->get_option('secret_key');
-    $publicKey = $paymayaGateway->get_option('public_key');
-
-    $client = new Cynder_PaymayaClient($isSandbox === 'yes', $publicKey, $secretKey);
+    /** The gateway's client already holds the keys, including ones set by wp-config.php constants. */
+    $client = $paymayaGateway->client;
 
     $payments = $client->getPaymentViaRrn($orderId);
 
@@ -308,19 +302,17 @@ add_filter('woocommerce_checkout_fields', 'cynder_paymaya_require_shipping_addre
 function update_paymaya_plugin() {
     $mainPluginSettings = get_option('woocommerce_paymaya_settings', array());
 
+    list($publicKey, $secretKey) = Cynder_Paymaya_Gateway::get_api_keys($mainPluginSettings);
+
     // Abort early if settings are uninitialized
-    if (empty($mainPluginSettings['public_key']) || empty($mainPluginSettings['secret_key'])) {
+    if (empty($publicKey) || empty($secretKey)) {
         wc_get_logger()->log('info', '[Update Maya Plugin] Settings uninitialized. Skipping webhook update.');
         return;
     }
 
     $isSandbox = isset($mainPluginSettings['sandbox']) && $mainPluginSettings['sandbox'] === 'yes';
 
-    $client = new Cynder_PaymayaClient(
-        $isSandbox,
-        $mainPluginSettings['public_key'],
-        $mainPluginSettings['secret_key']
-    );
+    $client = new Cynder_PaymayaClient($isSandbox, $publicKey, $secretKey);
 
     $webhooks = $client->retrieveWebhooks();
 
