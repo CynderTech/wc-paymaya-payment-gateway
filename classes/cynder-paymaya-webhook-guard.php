@@ -390,4 +390,30 @@ class Cynder_Paymaya_Webhook_Guard {
 
         return array(count($confirmed) > 1 ? 'ambiguous' : 'mismatch', null);
     }
+
+    /** Keys whose values are buyer personal data or order secrets; masked in debug logs. */
+    const REDACTED_KEYS = array(
+        'firstName', 'lastName', 'email', 'phone', 'line1', 'line2', 'zipCode',
+        'description', 'paymentTokenId', 'key',
+    );
+
+    /**
+     * Copy of $data with personal data masked, for debug logging. Structure and other values are kept so logs
+     * stay useful. Maya puts the buyer's email in a payment's description ("Charge for ..."), so that is masked too.
+     */
+    public static function redact_for_log($data) {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = self::redact_for_log($value);
+            } elseif (is_string($key) && in_array($key, self::REDACTED_KEYS, true) && $value !== null && $value !== '') {
+                $data[$key] = '[redacted]';
+            }
+        }
+
+        return $data;
+    }
 }

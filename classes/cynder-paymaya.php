@@ -285,7 +285,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'debug_mode' => array(
                 'title' => 'Debug Mode',
                 'type' => 'checkbox', 
-                'description' => 'Enables debug mode. Produces more verbose logs for most of the plugin processes. Helpful when coordinating with customer support.',
+                'description' => 'Enables debug mode. Produces more verbose logs for most of the plugin processes. Helpful when coordinating with customer support.<br/>Buyer names, emails, phone numbers and addresses are masked in these logs, but they still contain order and payment details. <strong>Turn this off when you are done.</strong>',
                 'default' => 'no',
             ),
             'require_billing_address_2' => array(
@@ -524,7 +524,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $encodedPayload = json_encode($payload);
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '] Payload' . wc_print_r($encodedPayload, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '] Payload' . wc_print_r(json_encode(Cynder_Paymaya_Webhook_Guard::redact_for_log($payload)), true));
         }
 
         $response = $this->client->createCheckout($encodedPayload);
@@ -566,7 +566,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $amountValue = floatval($amount);
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] Payments via RRN ' . wc_print_r($payments, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
         }
 
         $authorizationType = $order->get_meta($this->id . '_authorization_type');
@@ -594,7 +594,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $successfulPayment = $successfulPayments[0];
     
             if ($this->debug_mode) {
-                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Successful Payment ' . wc_print_r($successfulPayment, true));
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Successful Payment ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($successfulPayment), true));
             }
     
             if (!$successfulPayment) {
@@ -979,7 +979,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payment = json_decode($requestBody, true);
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payment Webhook payload ' . wc_print_r($payment, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payment Webhook payload ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payment), true));
         }
 
         if (!Cynder_Paymaya_Webhook_Guard::is_valid_webhook_payload($payment)) {
@@ -1076,7 +1076,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $payments = $this->client->getPaymentViaRrn($referenceNumber, self::WEBHOOK_LOOKUP_TIMEOUT);
 
             if ($this->debug_mode) {
-                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
             }
 
             list($outcome, $authorizedPayment) = Cynder_Paymaya_Webhook_Guard::classify_manual_capture($payments, floatval($order->get_total()), $order->get_currency(), $referenceNumber, $status);
@@ -1164,7 +1164,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         }
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
         }
     
         $successfulPayments = array_values(
@@ -1214,7 +1214,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorized payments ' . wc_print_r($authorizedPayments, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorized payments ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($authorizedPayments), true));
         }
 
         if (count($authorizedPayments) !== 0) {
@@ -1413,7 +1413,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $verifyString = "{$concatenatedFlatString}&nonce={$nonce}";
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Flattened Payload: '. $verifyString);
+            /** Logged with buyer data masked, so it will not match the signature byte for byte; the field list and order are what matter when debugging. */
+            $loggedFlat = $this->flatten_object_to_string(Cynder_Paymaya_Webhook_Guard::redact_for_log($payload));
+            sort($loggedFlat, SORT_STRING);
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Flattened Payload: ' . implode('&', $loggedFlat) . '&nonce=' . $nonce);
         }
         
         if ($this->sandbox === 'yes') {

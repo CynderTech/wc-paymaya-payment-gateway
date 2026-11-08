@@ -49,7 +49,7 @@ function cynder_paymaya_scripts($hook) {
     $payments = $client->getPaymentViaRrn($orderId);
 
     if ($debugMode === 'yes') {
-        wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_LOADING_ADMIN_JS_SCRIPTS_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
+        wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_LOADING_ADMIN_JS_SCRIPTS_BLOCK . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
     }
 
     if (array_key_exists('error', $payments)) {
@@ -181,7 +181,7 @@ function cynder_paymaya_capture_payment() {
     );
 
     if ($debugMode === 'yes') {
-        wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Authorized Payments ' . wc_print_r($authorizedPayments, true));
+        wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Authorized Payments ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($authorizedPayments), true));
     }
 
     if (count($authorizedPayments) === 0) {
@@ -242,7 +242,7 @@ function cynder_paymaya_catch_redirect() {
     $debugMode = $paymayaGateway->get_option('debug_mode');
 
     if ($debugMode === 'yes') {
-        wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] Redirect Params ' . wc_print_r($_GET, true));
+        wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] Redirect Params ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($_GET), true));
     }
 
     $orderId = isset($_GET['order']) ? sanitize_key($_GET['order']) : null;
