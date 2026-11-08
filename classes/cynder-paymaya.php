@@ -1033,12 +1033,17 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return false;
         }
 
-        /** Sandbox skips the IP allowlist (tunnels and local dev hide the sender IP); timestamp and signature are still enforced above. */
-        if ($this->sandbox === 'yes') {
+        /**
+         * Sandbox skips the IP allowlist by default (tunnels and local dev hide the sender IP); timestamp and signature
+         * are still enforced above. Return false from this filter to enforce the sandbox IPs as well.
+         */
+        if (apply_filters('cynder_paymaya_skip_webhook_ip_check', $this->sandbox === 'yes', $source)) {
             return true;
         }
 
-        $mayaIps = array('18.138.50.235', '3.1.207.200');
+        $mayaIps = $this->sandbox === 'yes'
+            ? array('13.229.160.234', '3.1.199.75')
+            : array('18.138.50.235', '3.1.207.200');
 
         if (!in_array($source, $mayaIps, true)) {
             /** Reached only after the signature verified, so Maya signed this request but it came from an unexpected IP. */
@@ -1500,7 +1505,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function verify_signature_v1($payload, $signature, $nonce) {
         $flatString = $this->flatten_object_to_string($payload);
-        /** Byte-wise order, matching the JavaScript sort() in Maya's reference implementation. */
+        /** Binary string order. Maya's reference code uses JavaScript sort() (UTF-16 code units), which is the same for the ASCII these payloads contain. */
         sort($flatString, SORT_STRING);
         $concatenatedFlatString = implode('&', $flatString);
         
