@@ -676,23 +676,22 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 )
             );
         
-            if (count($successfulPayments) === 0) return;
-        
-            $successfulPayment = $successfulPayments[0];
+            if (count($successfulPayments) === 0) {
+                return new WP_Error(404, 'Can\'t find payment record to refund in Maya');
+            }
+
+            /** Reference numbers are just order ids, so prefer the payment this order recorded when it was paid. */
+            $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
     
             if ($this->debug_mode) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Successful Payment ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($successfulPayment), true));
-            }
-    
-            if (!$successfulPayment) {
-                return new WP_Error(404, 'Can\'t find payment record to refund in Paymaya');
             }
     
             $paymentId = $successfulPayment['id'];
     
             /** Only void if payment is voidable and full amount */
             if ($successfulPayment['canVoid']) {
-                if ($amountValue === floatval($successfulPayment['amount'])) {
+                if (Cynder_Paymaya_Webhook_Guard::amounts_equal($amountValue, $successfulPayment['amount'])) {
 
                     $response = $this->client->voidPayment($paymentId, empty($reason) ? 'Merchant manually voided' : $reason);
 
@@ -747,8 +746,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 return new WP_Error(400, 'No authorized payment to refund');
             }
 
-            $authorizedPayment = $authorizedPayments[0];
-            $authorizedFullAmount = floatval($authorizedPayment['amount']);
+            $authorizedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedPayments, $order->get_transaction_id());
 
             /**
              * If there are no other payments other than the authorized payment,
@@ -763,7 +761,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     return new WP_Error(400, 'Authorized payment can no longer be voided');
                 }
                 
-                if ($authorized && $authorizedFullAmount === $amountValue) {
+                if ($authorized && Cynder_Paymaya_Webhook_Guard::amounts_equal($authorizedPayment['amount'], $amountValue)) {
                     $response = $this->client->voidPayment($paymentId, empty($reason) ? 'Merchant manually voided' : $reason);
 
                     if (array_key_exists("error", $response)) {
@@ -1272,7 +1270,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
     
         if (count($successfulPayments) !== 0) {
-            $successfulPayment = $successfulPayments[0];
+            $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
         
             if ($this->debug_mode) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payment ID ' . $successfulPayment['id'] . ' canRefund: ' . ($successfulPayment['canRefund'] == true ? 'true' : 'false'));
