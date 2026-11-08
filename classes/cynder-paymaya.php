@@ -1116,6 +1116,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if (empty($authorizationType) || $authorizationType === 'none') {
             /** For non-manual capture payments: */
 
+            list($failureAction, $failureNote) = Cynder_Paymaya_Webhook_Guard::failure_decision($status, false, false);
+
             if ($order->is_paid()) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Cannot process payment ' . $transactionRefNumber . ' with ' . $status . ' status.');
 
@@ -1145,26 +1147,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 }
 
                 $order->payment_complete($confirmedPayment['id']);
-            } else if ($status === 'PAYMENT_FAILED' || $status === 'PAYMENT_EXPIRED' || $status === 'PAYMENT_CANCELLED' || $status === 'AUTH_FAILED') {
-                $note = '';
-
-                switch ($status) {
-                    case 'PAYMENT_EXPIRED': {
-                        $note = 'Payment expired';
-                        break;
-                    }
-                    case 'PAYMENT_CANCELLED': {
-                        $note = 'Payment cancelled';
-                        break;
-                    }
-                    case 'AUTH_FAILED':
-                    case 'PAYMENT_FAILED':
-                    default: {
-                        $note = 'Payment failed';
-                    }
-                }
-
-                $order->update_status('failed', $note, true);
+            } else if ($failureAction === 'failed') {
+                $order->update_status('failed', $failureNote, true);
             } else {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Amount mismatch. Open payment details on Maya dashboard with txn ref number ' . $transactionRefNumber);
             }
@@ -1172,7 +1156,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             /** Process manual captures */
 
             /** A failure webhook must never change an order that is already paid. */
-            if ($order->is_paid() && in_array($status, array('PAYMENT_EXPIRED', 'PAYMENT_CANCELLED', 'AUTH_FAILED', 'PAYMENT_FAILED'), true)) {
+            list($failureAction, $failureNote) = Cynder_Paymaya_Webhook_Guard::failure_decision($status, $order->is_paid(), true);
+
+            if ($failureAction === 'ignore') {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Ignoring ' . $status . ' status for payment ' . $transactionRefNumber);
                 $order->add_order_note('Ignored failed payment ' . $transactionRefNumber . ' (' . $status . '): order is already paid');
 
@@ -1234,20 +1220,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             } else {
                 $note = '';
 
-                switch ($status) {
-                    case 'PAYMENT_SUCCESS': {
-                        $note = 'Successful payment ' . $payment['id'];
-                        break;
-                    }
-                    case 'PAYMENT_EXPIRED':
-                    case 'PAYMENT_CANCELLED':
-                    case 'AUTH_FAILED':
-                    case 'PAYMENT_FAILED': {
-                        $note = 'Failed payment ' . $payment['id'];
+                if ($status === 'PAYMENT_SUCCESS') {
+                    $note = 'Successful payment ' . $payment['id'];
+                } else if ($failureAction === 'on-hold') {
+                    $note = $failureNote . ' ' . $payment['id'];
 
-                        $order->update_status('on-hold');
-                        break;
-                    }
+                    $order->update_status('on-hold');
                 }
 
                 if (!empty($note)) {
