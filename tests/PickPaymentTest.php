@@ -41,6 +41,34 @@ class PickPaymentTest extends TestCase {
         $this->assertNull(Cynder_Paymaya_Webhook_Guard::pick_payment(array(), ''));
     }
 
+    /**
+     * Manual-capture orders record the AUTHORIZATION payment's id (every release since 1.1.4 stores the record chosen
+     * by its 'authorizationType' key) and callers pass only authorization records. Capture records, which carry
+     * 'authorizationPayment', never appear as candidates and are never the recorded id.
+     */
+    public function test_manual_capture_order_matches_its_authorization_not_the_captures() {
+        $authorizations = array(
+            array('id' => 'other-site-auth', 'authorizationType' => 'NORMAL', 'status' => 'AUTHORIZED'),
+            array('id' => 'my-auth', 'authorizationType' => 'NORMAL', 'status' => 'CAPTURED', 'capturedAmount' => '100'),
+        );
+
+        $this->assertSame('my-auth', Cynder_Paymaya_Webhook_Guard::pick_payment($authorizations, 'my-auth')['id']);
+    }
+
+    public function test_manual_capture_order_not_yet_fully_captured_has_no_recorded_id() {
+        // payment_complete() only runs on the final capture, so until then the first authorization is used.
+        $authorizations = array(array('id' => 'my-auth', 'authorizationType' => 'NORMAL', 'status' => 'AUTHORIZED'));
+
+        $this->assertSame('my-auth', Cynder_Paymaya_Webhook_Guard::pick_payment($authorizations, '')['id']);
+    }
+
+    public function test_a_capture_records_id_is_not_an_authorization() {
+        $authorizations = array(array('id' => 'my-auth', 'authorizationType' => 'NORMAL'));
+
+        // If an order ever recorded a capture id it must fail closed, not guess an authorization.
+        $this->assertNull(Cynder_Paymaya_Webhook_Guard::pick_payment($authorizations, 'my-capture'));
+    }
+
     public function test_malformed_entries_are_skipped_and_never_returned() {
         $junk = array('junk', array('no-id' => 1), null);
 

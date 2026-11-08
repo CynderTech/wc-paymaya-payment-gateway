@@ -81,7 +81,11 @@ function cynder_paymaya_scripts($hook) {
         return;
     }
 
-    $authorizedOrCapturedPayment = $authorizedOrCapturedPayments[0];
+    $authorizedOrCapturedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedOrCapturedPayments, $order->get_transaction_id());
+
+    if ($authorizedOrCapturedPayment === null) {
+        return;
+    }
 
     /** Enable for debugging purposes */
     // wc_get_logger()->log('info', 'Authorized Or Captured Payment ' . json_encode($authorizedOrCapturedPayment));

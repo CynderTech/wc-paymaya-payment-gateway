@@ -1314,7 +1314,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorized payments ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($authorizedPayments), true));
         }
 
-        if (count($authorizedPayments) !== 0) {
+        if (Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedPayments, $order->get_transaction_id()) !== null) {
             echo '<button type="button" class="button capture-items">Capture</button>';
         }
     }
@@ -1361,7 +1361,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return;
         }
 
-        $authorizedOrCapturedPayment = $authorizedOrCapturedPayments[0];
+        $authorizedOrCapturedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedOrCapturedPayments, $order->get_transaction_id());
+
+        if ($authorizedOrCapturedPayment === null) {
+            return;
+        }
+
         $authorizedAmount = $authorizedOrCapturedPayment['amount'];
         $capturedAmount = $authorizedOrCapturedPayment['capturedAmount'];
         $balance = floatval($authorizedAmount) - floatval($capturedAmount);
