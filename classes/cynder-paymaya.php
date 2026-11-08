@@ -192,12 +192,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
      * @return array [public key, secret key]
      */
     public static function get_api_keys($settings) {
-        $settings = is_array($settings) ? $settings : array();
-
-        $publicKey = defined('CYNDER_PAYMAYA_PUBLIC_KEY') ? (string) CYNDER_PAYMAYA_PUBLIC_KEY : (isset($settings['public_key']) ? (string) $settings['public_key'] : '');
-        $secretKey = defined('CYNDER_PAYMAYA_SECRET_KEY') ? (string) CYNDER_PAYMAYA_SECRET_KEY : (isset($settings['secret_key']) ? (string) $settings['secret_key'] : '');
-
-        return array($publicKey, $secretKey);
+        return Cynder_Paymaya_Webhook_Guard::resolve_api_keys(
+            $settings,
+            defined('CYNDER_PAYMAYA_PUBLIC_KEY') ? CYNDER_PAYMAYA_PUBLIC_KEY : null,
+            defined('CYNDER_PAYMAYA_SECRET_KEY') ? CYNDER_PAYMAYA_SECRET_KEY : null
+        );
     }
 
     /**
@@ -264,7 +263,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 'type'        => 'maya_key',
                 'constant'    => 'CYNDER_PAYMAYA_SECRET_KEY',
                 'secret'      => true,
-                'description' => 'Stored in the database unless set in wp-config.php with <code>define(\'CYNDER_PAYMAYA_SECRET_KEY\', \'...\');</code> (recommended). The saved key is never shown; leave this blank to keep it.',
+                'description' => 'Stored in the database unless set in wp-config.php with <code>define(\'CYNDER_PAYMAYA_SECRET_KEY\', \'...\');</code> (recommended). The saved key is never shown; leave this blank to keep it. After adding the constants, save these settings once so any copy already in the database is removed.',
             ),
             'webhook_title' => array(
                 'title' => 'Webhooks',
@@ -375,10 +374,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if ($fromConstant) {
             $value = '';
-            $placeholder = 'Set in wp-config.php (' . $constant . ')';
+            $placeholder = 'Set in wp-config.php (' . $constant . ')' . ($saved !== '' ? '. Save to remove the copy in the database.' : '');
         } elseif ($isSecret && $saved !== '') {
             $placeholder = 'Saved key ending in ' . substr($saved, -4) . '. Leave blank to keep it.';
         }
+
+        // Browsers ignore autocomplete="off" on password fields and may autofill the admin's own password here,
+        // which a save would then store as the secret key. new-password tells them not to.
+        $autocomplete = $isSecret ? 'new-password' : 'off';
 
         ob_start();
         ?>
@@ -389,7 +392,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             <td class="forminp">
                 <fieldset>
                     <legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
-                    <input class="input-text regular-input" type="<?php echo $isSecret ? 'password' : 'text'; ?>" name="<?php echo esc_attr($fieldKey); ?>" id="<?php echo esc_attr($fieldKey); ?>" value="<?php echo esc_attr($value); ?>" placeholder="<?php echo esc_attr($placeholder); ?>" autocomplete="off" <?php disabled($fromConstant, true); ?> />
+                    <input class="input-text regular-input" type="<?php echo $isSecret ? 'password' : 'text'; ?>" name="<?php echo esc_attr($fieldKey); ?>" id="<?php echo esc_attr($fieldKey); ?>" value="<?php echo esc_attr($value); ?>" placeholder="<?php echo esc_attr($placeholder); ?>" autocomplete="<?php echo esc_attr($autocomplete); ?>" <?php disabled($fromConstant, true); ?> />
+                    <?php if ($isSecret && !$fromConstant && $saved !== '') : ?>
+                        <label style="display:block;margin-top:4px;"><input type="checkbox" name="<?php echo esc_attr($fieldKey); ?>_remove" value="1" /> Remove the saved key</label>
+                    <?php endif; ?>
                     <?php echo $this->get_description_html($data); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                 </fieldset>
             </td>
@@ -399,22 +405,34 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         return ob_get_clean();
     }
 
-    /** Keys set by constant are not overwritten, and a blank secret keeps the saved one. */
+    /**
+     * A key defined by constant is stored as empty (wiping the database copy), a blank secret keeps the saved one,
+     * "Remove the saved key" clears it. A value without Maya's key prefix is still saved but flagged, since the
+     * usual cause is a browser autofilling the wrong field.
+     */
     public function validate_maya_key_field($key, $value) {
         $field = isset($this->form_fields[$key]) ? $this->form_fields[$key] : array();
+        $isSecret = !empty($field['secret']);
         $saved = (string) $this->get_option($key);
+        $constantDefined = !empty($field['constant']) && defined($field['constant']);
 
-        if (!empty($field['constant']) && defined($field['constant'])) {
-            return $saved;
+        $postData = $this->get_post_data();
+        $remove = !empty($postData[$this->get_field_key($key) . '_remove']);
+
+        $posted = is_null($value) ? '' : sanitize_text_field(wp_unslash($value));
+        $result = Cynder_Paymaya_Webhook_Guard::resolve_key_field($posted, $saved, $isSecret, $constantDefined, $remove);
+
+        if ($result !== '' && $result !== $saved && !Cynder_Paymaya_Webhook_Guard::key_looks_valid($result, $isSecret)) {
+            $message = 'Maya: the ' . ($isSecret ? 'Secret' : 'Public') . ' Key does not start with "' . ($isSecret ? 'sk-' : 'pk-') . '". Check that you pasted the right key; browsers sometimes autofill these fields with a different value.';
+
+            if (class_exists('WC_Admin_Settings')) {
+                WC_Admin_Settings::add_error($message);
+            } else {
+                $this->add_error($message);
+            }
         }
 
-        $value = is_null($value) ? '' : trim(sanitize_text_field(wp_unslash($value)));
-
-        if ($value === '' && !empty($field['secret'])) {
-            return $saved;
-        }
-
-        return $value;
+        return $result;
     }
 
     /** Keep only valid IPs/CIDRs and tell the merchant about the rest, instead of silently ignoring them. */
