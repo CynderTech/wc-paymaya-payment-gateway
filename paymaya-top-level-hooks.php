@@ -150,6 +150,16 @@ function cynder_paymaya_capture_payment() {
         );
     }
 
+    /** Only capture for orders that exist here and were paid with Maya; reference numbers are just order ids. */
+    $order = wc_get_order($orderId);
+
+    if (!$order || $order->get_payment_method() !== $paymentGatewaId) {
+        return wp_send_json(
+            array('error' => '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '] Order was not paid with Maya'),
+            400
+        );
+    }
+
     /** The gateway's client already holds the keys, including ones set by wp-config.php constants. */
     $client = $paymayaGateway->client;
 
@@ -186,7 +196,6 @@ function cynder_paymaya_capture_payment() {
     }
 
     $authorizedPayment = $authorizedPayments[0];
-    $order = wc_get_order($orderId);
     $currency = $order->get_currency();
 
     $payload = json_encode(
