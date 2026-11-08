@@ -292,6 +292,12 @@ function cynder_paymaya_catch_redirect() {
         wp_safe_redirect($order->get_checkout_payment_url());
         exit;
     }
+
+    /** Unknown or missing status: the order key was valid, so send the customer somewhere useful instead of a blank page. */
+    wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] Unexpected redirect status for order ID ' . $orderId);
+    wc_add_notice('We could not confirm your payment status. If you were charged, contact the store with your order number.', 'error');
+    wp_safe_redirect($order->get_checkout_payment_url());
+    exit;
 }
 
 add_action(
