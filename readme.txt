@@ -67,6 +67,13 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 * If the payment webhook does not arrive, the order is re-checked with Maya 30 minutes after the customer returns from checkout.
 * Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified).
 * New `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
+* Fix: if Maya rejects a checkout request, the customer now sees a message instead of a blank failure.
+* Fix: Maya order screens no longer look up payments for orders paid with other gateways, so Void and Capture controls only appear on Maya orders.
+* Fix: refunds act on the payment recorded for the order, even if another payment shares its reference number, and report an error when no payment is found.
+* Fix: capture checks the order exists and was paid with Maya before contacting Maya.
+* Fix: an unexpected error response from Maya can no longer crash the settings page or the capture button.
+* Cancelled Maya payments now mark unpaid orders as failed so the customer can retry. Plugin updates and saving settings register the new PAYMENT_CANCELLED webhook.
+* An unrecognised payment return status now sends the customer to the order's pay page instead of a blank page.
 * Tested with PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12, WordPress 7.1.3 and WooCommerce 11.2.1.
 
 = 1.4.1 =
