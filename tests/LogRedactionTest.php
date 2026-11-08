@@ -59,4 +59,20 @@ class LogRedactionTest extends TestCase {
         $this->assertSame('plain string', Cynder_Paymaya_Webhook_Guard::redact_for_log('plain string'));
         $this->assertNull(Cynder_Paymaya_Webhook_Guard::redact_for_log(null));
     }
+    public function test_further_buyer_and_card_fields_are_masked() {
+        $redacted = Cynder_Paymaya_Webhook_Guard::redact_for_log(array(
+            'buyer' => array('firstName' => 'Juan', 'middleName' => 'Santos', 'birthday' => '1990-01-01', 'ipAddress' => '203.0.113.9'),
+            'fundSource' => array('type' => 'card', 'details' => array('scheme' => 'master-card', 'first6' => '412345', 'last4' => '1381', 'masked' => '412345******1381')),
+        ));
+
+        $this->assertSame('[redacted]', $redacted['buyer']['middleName']);
+        $this->assertSame('[redacted]', $redacted['buyer']['birthday']);
+        $this->assertSame('[redacted]', $redacted['buyer']['ipAddress']);
+        $this->assertSame('[redacted]', $redacted['fundSource']['details']['first6']);
+        $this->assertSame('[redacted]', $redacted['fundSource']['details']['masked']);
+        // The scheme and last 4 digits stay: support needs them and they identify no one on their own.
+        $this->assertSame('master-card', $redacted['fundSource']['details']['scheme']);
+        $this->assertSame('1381', $redacted['fundSource']['details']['last4']);
+    }
 }
+

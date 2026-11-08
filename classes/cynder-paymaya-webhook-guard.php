@@ -419,30 +419,126 @@ class Cynder_Paymaya_Webhook_Guard {
     }
 
     /**
-     * The payment to act on for an order out of several Maya payments sharing its reference number. Prefer the one
-     * whose id the order stored when it was paid; reference numbers are just the WooCommerce order id, so other
-     * sites on the same Maya account (or a shared sandbox) can produce look-alikes. Falls back to the first.
+     * The payment to act on for an order out of several Maya payments sharing its reference number.
+     *
+     * Reference numbers are just the WooCommerce order id, so other sites on the same Maya account (or a shared
+     * sandbox) can produce look-alikes. When the order recorded a payment id (every order completed by this plugin
+     * has one) only that payment is acceptable: if it is not among the candidates, return null instead of guessing,
+     * because the caller is about to refund, void or capture real money. Only when no id was recorded (e.g. a
+     * manual-capture order not yet fully captured) fall back to the first valid payment.
      *
      * @return array|null
      */
     public static function pick_payment(array $payments, $transactionId) {
-        $payments = array_values($payments);
+        $payments = array_values(array_filter($payments, 'is_array'));
 
         if (is_string($transactionId) && $transactionId !== '') {
             foreach ($payments as $payment) {
-                if (is_array($payment) && isset($payment['id']) && (string) $payment['id'] === $transactionId) {
+                if (isset($payment['id']) && (string) $payment['id'] === $transactionId) {
                     return $payment;
                 }
             }
+
+            return null;
         }
 
-        return isset($payments[0]) ? $payments[0] : null;
+        foreach ($payments as $payment) {
+            if (isset($payment['id'])) {
+                return $payment;
+            }
+        }
+
+        return null;
     }
 
+    /**
+     * API keys to use: a defined constant wins over the saved setting. Pure; the gateway passes defined() values in.
+     *
+     * @param array       $settings       Saved gateway settings.
+     * @param string|null $publicConstant Value of CYNDER_PAYMAYA_PUBLIC_KEY, or null when not defined.
+     * @param string|null $secretConstant Value of CYNDER_PAYMAYA_SECRET_KEY, or null when not defined.
+     * @return array [public key, secret key]
+     */
+    public static function resolve_api_keys($settings, $publicConstant, $secretConstant) {
+        $settings = is_array($settings) ? $settings : array();
+
+        $public = $publicConstant !== null ? (string) $publicConstant : (isset($settings['public_key']) ? (string) $settings['public_key'] : '');
+        $secret = $secretConstant !== null ? (string) $secretConstant : (isset($settings['secret_key']) ? (string) $settings['secret_key'] : '');
+
+        return array($public, $secret);
+    }
+
+    /**
+     * Value to store for an API key field on save.
+     *
+     * - A key defined by constant is stored as '' so the copy in the database is wiped on the next save.
+     * - A secret field left blank keeps the saved secret (the field never shows it); "remove" clears it.
+     * - Anything else is the posted value, trimmed.
+     */
+    public static function resolve_key_field($posted, $saved, $isSecret, $constantDefined, $remove = false) {
+        if ($constantDefined) {
+            return '';
+        }
+
+        if ($isSecret && $remove) {
+            return '';
+        }
+
+        $posted = is_string($posted) ? trim($posted) : '';
+
+        if ($posted === '' && $isSecret) {
+            return (string) $saved;
+        }
+
+        return $posted;
+    }
+
+    /** Whether a key value has the prefix Maya issues (pk- for public, sk- for secret keys). */
+    public static function key_looks_valid($value, $isSecret) {
+        return is_string($value) && strpos($value, $isSecret ? 'sk-' : 'pk-') === 0;
+    }
+
+    /** Webhook statuses that mean the payment did not go through. */
+    const FAILURE_STATUSES = array('PAYMENT_FAILED', 'PAYMENT_EXPIRED', 'PAYMENT_CANCELLED', 'AUTH_FAILED');
+
+    /**
+     * What to do with an order for a payment webhook status that is not a success.
+     *
+     * @param string $status          Webhook status.
+     * @param bool   $isPaid          Whether the order is already paid; a failure webhook must never change it.
+     * @param bool   $isManualCapture Whether the order uses authorize-and-capture.
+     * @return array [action, note]. action: 'none' (not a failure status), 'ignore' (order already paid),
+     *               'failed' (normal orders: mark failed so the customer can retry) or 'on-hold' (manual capture).
+     */
+    public static function failure_decision($status, $isPaid, $isManualCapture) {
+        if (!in_array($status, self::FAILURE_STATUSES, true)) {
+            return array('none', '');
+        }
+
+        if ($isPaid) {
+            return array('ignore', '');
+        }
+
+        if ($isManualCapture) {
+            return array('on-hold', 'Failed payment');
+        }
+
+        if ($status === 'PAYMENT_EXPIRED') {
+            return array('failed', 'Payment expired');
+        }
+
+        if ($status === 'PAYMENT_CANCELLED') {
+            return array('failed', 'Payment cancelled');
+        }
+
+        return array('failed', 'Payment failed');
+    }
     /** Keys whose values are buyer personal data or order secrets; masked in debug logs. */
     const REDACTED_KEYS = array(
         'firstName', 'lastName', 'email', 'phone', 'line1', 'line2', 'zipCode',
         'description', 'paymentTokenId', 'key',
+        // Further buyer and card fields Maya can return or accept.
+        'middleName', 'birthday', 'ipAddress', 'first6', 'masked',
     );
 
     /**
