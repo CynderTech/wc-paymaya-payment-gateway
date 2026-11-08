@@ -472,7 +472,8 @@ class Cynder_Paymaya_Webhook_Guard {
      * Value to store for an API key field on save.
      *
      * - A key defined by constant is stored as '' so the copy in the database is wiped on the next save.
-     * - A secret field left blank keeps the saved secret (the field never shows it); "remove" clears it.
+     * - A secret field left blank keeps the saved secret (the field never shows it); "remove" clears it only
+     *   when the field is blank, a typed key wins.
      * - Anything else is the posted value, trimmed.
      */
     public static function resolve_key_field($posted, $saved, $isSecret, $constantDefined, $remove = false) {
@@ -480,14 +481,12 @@ class Cynder_Paymaya_Webhook_Guard {
             return '';
         }
 
-        if ($isSecret && $remove) {
-            return '';
-        }
-
         $posted = is_string($posted) ? trim($posted) : '';
 
         if ($posted === '' && $isSecret) {
-            return (string) $saved;
+            // Blank keeps the saved secret unless "remove" was ticked. A typed key always wins over "remove",
+            // so someone who ticks it meaning "replace" does not end up with no key.
+            return $remove ? '' : (string) $saved;
         }
 
         return $posted;

@@ -378,7 +378,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if ($fromConstant) {
             $value = '';
-            $placeholder = 'Set in wp-config.php (' . $constant . ')' . ($saved !== '' ? '. Save to remove the copy in the database.' : '');
+            $placeholder = (string) constant($constant) === ''
+                ? $constant . ' is defined in wp-config.php but empty, so no key is set'
+                : 'Set in wp-config.php (' . $constant . ')' . ($saved !== '' ? '. Save to remove the copy in the database.' : '');
         } elseif ($isSecret && $saved !== '') {
             $placeholder = 'Saved key ending in ' . substr($saved, -4) . '. Leave blank to keep it.';
         }
@@ -425,6 +427,16 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         $posted = is_null($value) ? '' : sanitize_text_field(wp_unslash($value));
         $result = Cynder_Paymaya_Webhook_Guard::resolve_key_field($posted, $saved, $isSecret, $constantDefined, $remove);
+
+        if ($constantDefined && (string) constant($field['constant']) === '') {
+            $emptyMessage = 'Maya: ' . $field['constant'] . ' is defined in wp-config.php but empty (for example a missing environment variable), so no ' . ($isSecret ? 'secret' : 'public') . ' key is set.';
+
+            if (class_exists('WC_Admin_Settings')) {
+                WC_Admin_Settings::add_error($emptyMessage);
+            } else {
+                $this->add_error($emptyMessage);
+            }
+        }
 
         if ($result !== '' && $result !== $saved && !Cynder_Paymaya_Webhook_Guard::key_looks_valid($result, $isSecret)) {
             $message = 'Maya: the ' . ($isSecret ? 'Secret' : 'Public') . ' Key does not start with "' . ($isSecret ? 'sk-' : 'pk-') . '". Check that you pasted the right key; browsers sometimes autofill these fields with a different value.';

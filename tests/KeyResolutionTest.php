@@ -41,6 +41,11 @@ class KeyResolutionTest extends TestCase {
         $this->assertSame('', Cynder_Paymaya_Webhook_Guard::resolve_key_field('', 'sk-saved', true, false, true));
     }
 
+    public function test_a_typed_key_wins_over_remove() {
+        // Ticking "Remove the saved key" while typing a new one means "replace", not "leave me with no key".
+        $this->assertSame('sk-new', Cynder_Paymaya_Webhook_Guard::resolve_key_field('sk-new', 'sk-saved', true, false, true));
+    }
+
     public function test_a_blank_public_key_is_cleared_not_kept() {
         $this->assertSame('', Cynder_Paymaya_Webhook_Guard::resolve_key_field('', 'pk-saved', false, false));
     }
