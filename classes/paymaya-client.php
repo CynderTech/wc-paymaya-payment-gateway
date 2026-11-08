@@ -1,6 +1,6 @@
 <?php
 
-if (!defined('ABSPATH')) {
+if (!defined('ABSPATH') && !defined('CYNDER_PAYMAYA_TESTING')) {
     exit;
 }
 
@@ -54,6 +54,13 @@ class Cynder_PaymayaClient {
         }
 
         $body = json_decode($response['body'], true);
+
+        /** Callers run array_key_exists() on the result, which throws a TypeError on PHP 8 for null or scalars (empty or non-JSON 2xx body). */
+        if (!is_array($body)) {
+            return array(
+                'error' => 'Unexpected or empty response from Maya.'
+            );
+        }
 
         return $body;
     }
