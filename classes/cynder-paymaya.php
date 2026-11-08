@@ -1497,7 +1497,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function verify_signature_v1($payload, $signature, $nonce) {
         $flatString = $this->flatten_object_to_string($payload);
-        sort($flatString);
+        /** Byte-wise order, matching the JavaScript sort() in Maya's reference implementation. */
+        sort($flatString, SORT_STRING);
         $concatenatedFlatString = implode('&', $flatString);
         
         $verifyString = "{$concatenatedFlatString}&nonce={$nonce}";
@@ -1520,6 +1521,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             }
             $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION;
         }
+
+        /** Maya rotates these keys; sites can add the new ones before a plugin update ships them. */
+        $publicKeys = (array) apply_filters('cynder_paymaya_webhook_public_keys', $publicKeys, $this->sandbox === 'yes');
 
         return Cynder_Paymaya_Webhook_Guard::is_valid_signature($verifyString, $signature, $publicKeys);
     }
