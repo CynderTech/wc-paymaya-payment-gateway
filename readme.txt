@@ -49,7 +49,7 @@ In Sandbox Mode the webhook source-IP check is skipped so that tunnels such as n
 
 = Keeping your API keys out of the database =
 
-The secret key is never shown again after it is saved; leave the field blank to keep it. To keep the keys out of the database entirely, add `define('CYNDER_PAYMAYA_PUBLIC_KEY', '...');` and `define('CYNDER_PAYMAYA_SECRET_KEY', '...');` to `wp-config.php`.
+The secret key is never shown again after it is saved; leave the field blank to keep it. To keep the keys out of the database entirely, add `define('CYNDER_PAYMAYA_PUBLIC_KEY', '...');` and `define('CYNDER_PAYMAYA_SECRET_KEY', '...');` to `wp-config.php`, then save the settings once so any copy already in the database is removed.
 
 = Updating =
 
@@ -61,7 +61,7 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 * Fix: an empty or unexpected response from Maya no longer causes a fatal error on PHP 8 at checkout, refund, void, capture or settings save.
 * Fix: saving new API keys now registers webhooks with the new keys straight away (previously it needed a second save).
-* Security: the secret key is masked and never shown after saving; API keys can be set in wp-config.php instead of the database.
+* Security: the secret key is masked and never shown after saving, with an option to remove it; API keys can be set in wp-config.php instead of the database.
 * Security: debug logs mask buyer names, emails, phone numbers, addresses and order keys.
 * Plugin updates now replace only the plugin's own webhooks instead of deleting every webhook on the Maya account.
 * If the payment webhook does not arrive, the order is re-checked with Maya 30 minutes after the customer returns from checkout.
@@ -69,12 +69,12 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 * New `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
 * Fix: if Maya rejects a checkout request, the customer now sees a message instead of a blank failure.
 * Fix: Maya order screens no longer look up payments for orders paid with other gateways, so Void and Capture controls only appear on Maya orders.
-* Fix: refunds act on the payment recorded for the order, even if another payment shares its reference number, and report an error when no payment is found.
+* Fix: refunds, voids and captures act only on the payment recorded for the order, even if another payment shares its reference number, and report an error when it is not found.
 * Fix: capture checks the order exists and was paid with Maya before contacting Maya.
 * Fix: an unexpected error response from Maya can no longer crash the settings page or the capture button.
 * Cancelled Maya payments now mark unpaid orders as failed so the customer can retry. Plugin updates and saving settings register the new PAYMENT_CANCELLED webhook.
 * An unrecognised payment return status now sends the customer to the order's pay page instead of a blank page.
-* Tested with PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12, WordPress 7.1.3 and WooCommerce 11.2.1.
+* Compatible with PHP 8.2 to 8.5. Tested with WordPress 7.1.3 and WooCommerce 11.2.1.
 
 = 1.4.1 =
 *Release Date - October 2, 2026*
