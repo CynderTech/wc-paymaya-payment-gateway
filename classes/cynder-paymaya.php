@@ -329,13 +329,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('error', '[Registering Webhooks] ' . wc_print_r($response, true));
         }
 
-        if (isset($response["error"]["error"])) {
-            $this->add_error($response["error"]["error"]);
-        } else if (isset($response["error"]["message"])) {
-            $this->add_error($response["error"]["message"]);
-        } else {
-            $this->add_error($response["error"]);
-        }
+        $this->add_error(Cynder_Paymaya_Webhook_Guard::error_message($response));
     }
 
     /**
@@ -648,7 +642,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
             return false;
         }
 
@@ -699,7 +693,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     $response = $this->client->voidPayment($paymentId, empty($reason) ? 'Merchant manually voided' : $reason);
 
                     if (array_key_exists("error", $response)) {
-                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . $response['error']);
+                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                         return false;
                     }
             
@@ -723,7 +717,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 $response = $this->client->refundPayment($paymentId, $payload);
         
                 if (array_key_exists("error", $response)) {
-                    wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT . '] ' . $response['error']);
+                    wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                     return false;
                 }
         
@@ -769,7 +763,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     $response = $this->client->voidPayment($paymentId, empty($reason) ? 'Merchant manually voided' : $reason);
 
                     if (array_key_exists("error", $response)) {
-                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . $response['error']);
+                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                         return false;
                     }
 
@@ -921,7 +915,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             if (array_key_exists("error", $response)) {
                 $errorIdentifier = $actionType === 'void' ? CYNDER_PAYMAYA_VOID_PAYMENT_EVENT : CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT;
-                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_MASS_REFUND_PAYMENT_BLOCK . '][' . $errorIdentifier . '] ' . $response['error']);
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_MASS_REFUND_PAYMENT_BLOCK . '][' . $errorIdentifier . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                 return new WP_Error(400, 'Something went wrong with the refund. Check your Maya merchant dashboard for actual balances.');
             }
         }
@@ -1248,7 +1242,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
             return;
         }
 
@@ -1321,7 +1315,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_AFTER_TOTALS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_AFTER_TOTALS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
             return;
         }
     

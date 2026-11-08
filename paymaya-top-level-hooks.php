@@ -50,7 +50,7 @@ function cynder_paymaya_scripts($hook) {
     }
 
     if (array_key_exists('error', $payments)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_LOADING_ADMIN_JS_SCRIPTS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_LOADING_ADMIN_JS_SCRIPTS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
         return;
     }
 
@@ -208,11 +208,7 @@ function cynder_paymaya_capture_payment() {
     if (array_key_exists("error", $response)) {
         wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_BLOCK . '][' . CYNDER_PAYMAYA_CAPTURE_PAYMENT_EVENT . '] ' . wc_print_r($response['error'], true));
 
-        $message = 'An error occured. If issue persists, contact Maya support.';
-
-        if (array_key_exists('message', $response['error'])) {
-            $message = $response['error']['message'];
-        }
+        $message = Cynder_Paymaya_Webhook_Guard::error_message($response, 'An error occured. If issue persists, contact Maya support.');
 
         return wp_send_json(
             array('error' => $message),
