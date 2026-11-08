@@ -1447,8 +1447,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     /**
      * Maya retries a webhook only 4 times over about an hour. If we still could not confirm a payment by then,
      * re-check once more later (Action Scheduler ships with WooCommerce) so a paid order is not left pending.
+     * $delay defaults to 2 hours; the customer's success redirect uses a shorter one (see cynder_paymaya_catch_redirect).
      */
-    function schedule_reconcile($order, $attempt = 1) {
+    function schedule_reconcile($order, $attempt = 1, $delay = null) {
         if (!function_exists('as_schedule_single_action') || !function_exists('as_has_scheduled_action')) {
             return;
         }
@@ -1456,7 +1457,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $args = array($order->get_id(), $attempt);
 
         if (!as_has_scheduled_action(self::RECONCILE_HOOK, $args)) {
-            as_schedule_single_action(time() + 2 * HOUR_IN_SECONDS, self::RECONCILE_HOOK, $args);
+            as_schedule_single_action(time() + ($delay === null ? 2 * HOUR_IN_SECONDS : (int) $delay), self::RECONCILE_HOOK, $args);
         }
     }
 

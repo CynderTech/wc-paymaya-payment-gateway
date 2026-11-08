@@ -272,6 +272,14 @@ function cynder_paymaya_catch_redirect() {
     $status = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
 
     if ($status === 'success') {
+        /**
+         * Safety net if the payment webhook never arrives (endpoint unreachable, blocked, misconfigured): re-check the
+         * order with Maya after the webhook retries should have landed. A no-op if the webhook already completed it.
+         */
+        if (!$order->is_paid() && $order->get_payment_method() === $paymentGatewaId) {
+            $paymayaGateway->schedule_reconcile($order, 1, 30 * MINUTE_IN_SECONDS);
+        }
+
         wp_safe_redirect($order->get_checkout_order_received_url());
         exit;
     } else if ($status === 'failed') {
