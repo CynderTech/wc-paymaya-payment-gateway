@@ -391,6 +391,54 @@ class Cynder_Paymaya_Webhook_Guard {
         return array(count($confirmed) > 1 ? 'ambiguous' : 'mismatch', null);
     }
 
+    /**
+     * Human-readable text for a client response that carries an 'error', whatever its shape: a string (transport
+     * failure, non-JSON body), an object with 'error' or 'message', or something else entirely. Callers log it,
+     * show it to an admin or compare it as a string, none of which are safe on an array or null (TypeError on PHP 8).
+     */
+    public static function error_message($response, $fallback = 'Unexpected response from Maya.') {
+        $error = is_array($response) && array_key_exists('error', $response) ? $response['error'] : $response;
+
+        if (is_string($error) && $error !== '') {
+            return $error;
+        }
+
+        if (is_array($error)) {
+            foreach (array('error', 'message') as $key) {
+                if (isset($error[$key]) && is_string($error[$key]) && $error[$key] !== '') {
+                    return $error[$key];
+                }
+            }
+
+            if (isset($error['code']) && is_scalar($error['code']) && $error['code'] !== '') {
+                return 'Maya error code ' . $error['code'];
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * The payment to act on for an order out of several Maya payments sharing its reference number. Prefer the one
+     * whose id the order stored when it was paid; reference numbers are just the WooCommerce order id, so other
+     * sites on the same Maya account (or a shared sandbox) can produce look-alikes. Falls back to the first.
+     *
+     * @return array|null
+     */
+    public static function pick_payment(array $payments, $transactionId) {
+        $payments = array_values($payments);
+
+        if (is_string($transactionId) && $transactionId !== '') {
+            foreach ($payments as $payment) {
+                if (is_array($payment) && isset($payment['id']) && (string) $payment['id'] === $transactionId) {
+                    return $payment;
+                }
+            }
+        }
+
+        return isset($payments[0]) ? $payments[0] : null;
+    }
+
     /** Keys whose values are buyer personal data or order secrets; masked in debug logs. */
     const REDACTED_KEYS = array(
         'firstName', 'lastName', 'email', 'phone', 'line1', 'line2', 'zipCode',
