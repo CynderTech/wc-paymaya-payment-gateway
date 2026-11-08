@@ -316,7 +316,7 @@ function update_paymaya_plugin() {
 
     $webhooks = $client->retrieveWebhooks();
 
-    if ($mainPluginSettings['debug_mode'] === 'yes') {
+    if (isset($mainPluginSettings['debug_mode']) && $mainPluginSettings['debug_mode'] === 'yes') {
         wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] ' . wc_print_r($webhooks, true));
     }
 
@@ -326,6 +326,11 @@ function update_paymaya_plugin() {
     }
 
     foreach($webhooks as $webhook) {
+        /** Only replace the webhooks this plugin manages; others on the Maya account may belong to other integrations. */
+        if (!is_array($webhook) || !isset($webhook['id'], $webhook['name']) || !in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true)) {
+            continue;
+        }
+
         $deletedWebhook = $client->deleteWebhook($webhook["id"]);
 
         if (array_key_exists("error", $deletedWebhook)) {
