@@ -287,11 +287,12 @@ function cynder_paymaya_catch_redirect() {
 
     if ($status === 'success') {
         /**
-         * Safety net if the payment webhook never arrives (endpoint unreachable, blocked, misconfigured): re-check the
-         * order with Maya after the webhook retries should have landed. A no-op if the webhook already completed it.
+         * Safety net if the payment webhook never arrives (endpoint unreachable, blocked, misconfigured). Maya retries
+         * a failed webhook at 0, 5, 15 and 45 minutes (about 65 minutes in all), so re-check once that window has
+         * passed. A no-op if the webhook already completed the order.
          */
         if (!$order->is_paid() && $order->get_payment_method() === $paymentGatewaId) {
-            $paymayaGateway->schedule_reconcile($order, 1, 30 * MINUTE_IN_SECONDS);
+            $paymayaGateway->schedule_reconcile($order, 1, 75 * MINUTE_IN_SECONDS);
         }
 
         wp_safe_redirect($order->get_checkout_order_received_url());
@@ -304,7 +305,7 @@ function cynder_paymaya_catch_redirect() {
 
     /** Unknown or missing status: the order key was valid, so send the customer somewhere useful instead of a blank page. */
     wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_CATCH_REDIRECT_BLOCK . '] Unexpected redirect status for order ID ' . $orderId);
-    wc_add_notice('We could not confirm your payment status. If you were charged, contact the store with your order number.', 'error');
+    wc_add_notice(__('We could not confirm the status of your Maya payment. Please check your order status or contact the store.', 'wc-paymaya-payment-gateway'), 'error');
     wp_safe_redirect($order->get_checkout_payment_url());
     exit;
 }

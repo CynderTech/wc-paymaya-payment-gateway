@@ -630,7 +630,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '][' . CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT . '] ' . json_encode($response['error']));
 
             /** WooCommerce shows only what is in the notices; without one the customer sees a failed checkout with no explanation. */
-            wc_add_notice('We could not start your Maya payment. Please try again, or choose another payment method.', 'error');
+            wc_add_notice(__('We could not start your Maya payment. Please try again, or choose another payment method.', 'wc-paymaya-payment-gateway'), 'error');
 
             return array('result' => 'failure');
         }
