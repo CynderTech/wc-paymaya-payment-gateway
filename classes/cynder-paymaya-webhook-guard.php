@@ -532,6 +532,7 @@ class Cynder_Paymaya_Webhook_Guard {
 
         return array('failed', 'Payment failed');
     }
+
     /** Keys whose values are buyer personal data or order secrets; masked in debug logs. */
     const REDACTED_KEYS = array(
         'firstName', 'lastName', 'email', 'phone', 'line1', 'line2', 'zipCode',

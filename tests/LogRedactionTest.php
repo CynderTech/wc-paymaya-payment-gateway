@@ -59,6 +59,7 @@ class LogRedactionTest extends TestCase {
         $this->assertSame('plain string', Cynder_Paymaya_Webhook_Guard::redact_for_log('plain string'));
         $this->assertNull(Cynder_Paymaya_Webhook_Guard::redact_for_log(null));
     }
+
     public function test_further_buyer_and_card_fields_are_masked() {
         $redacted = Cynder_Paymaya_Webhook_Guard::redact_for_log(array(
             'buyer' => array('firstName' => 'Juan', 'middleName' => 'Santos', 'birthday' => '1990-01-01', 'ipAddress' => '203.0.113.9'),
@@ -75,4 +76,3 @@ class LogRedactionTest extends TestCase {
         $this->assertSame('1381', $redacted['fundSource']['details']['last4']);
     }
 }
-

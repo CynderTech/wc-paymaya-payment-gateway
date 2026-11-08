@@ -64,8 +64,8 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 * Security: the secret key is masked and never shown after saving, with an option to remove it; API keys can be set in wp-config.php instead of the database.
 * Security: debug logs mask buyer names, emails, phone numbers, addresses and order keys.
 * Plugin updates now replace only the plugin's own webhooks instead of deleting every webhook on the Maya account.
-* If the payment webhook does not arrive, the order is re-checked with Maya 30 minutes after the customer returns from checkout.
-* Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified).
+* If the payment webhook does not arrive, the order is re-checked with Maya 75 minutes after the customer returns from checkout.
+* Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified). The `cynder_paymaya_skip_webhook_ip_check` filter can turn it back on.
 * New `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
 * Fix: if Maya rejects a checkout request, the customer now sees a message instead of a blank failure.
 * Fix: Maya order screens no longer look up payments for orders paid with other gateways, so Void and Capture controls only appear on Maya orders.

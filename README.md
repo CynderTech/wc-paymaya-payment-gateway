@@ -26,7 +26,7 @@ With Maya Checkout, your website or app can directly accept credit and debit car
 This version (1.4.1) is currently compatible with the following WordPress and WooCommerce version:
 * WordPress 7.1
 * WooCommerce 11.2.1
-* PHP 7.2.5 or later. Lint and the PHPUnit suite pass on PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12, the releases that fix CVE-2026-109618 and CVE-2026-109619. The only manual end-to-end sandbox test so far was on PHP 8.5.12. Keep PHP on a supported, patched release.
+* PHP 7.2.5 or later. Lint and the PHPUnit suite pass on PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12, the releases that fix CVE-2026-109618 and CVE-2026-109619. Keep PHP on a supported, patched release.
 
 ### Keeping your API keys out of the database
 The secret key is never shown again after it is saved; leave the field blank to keep it, or tick **Remove the saved key** to clear it. A key that does not start with `pk-` / `sk-` is still saved but flagged, because the usual cause is a browser autofilling the wrong field. To keep the keys out of the database entirely, define them in `wp-config.php`. The settings fields are then locked, and the next time you save the settings any copy already in the database is removed (so save once after adding the constants; if you later remove the constants, enter the keys again):
