@@ -368,28 +368,12 @@ function update_paymaya_plugin() {
 
     $webhookUrl = isset($mainPluginSettings['webhook_payment_status']) ? $mainPluginSettings['webhook_payment_status'] : home_url( '/?wc-api=cynder_paymaya_payment' );
 
-    $createdWebhook = $client->createWebhook('PAYMENT_SUCCESS', $webhookUrl);
+    foreach (CYNDER_PAYMAYA_PAYMENT_WEBHOOKS as $webhookName) {
+        $createdWebhook = $client->createWebhook($webhookName, $webhookUrl);
 
-    if (array_key_exists("error", $createdWebhook)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhooks ' . wc_print_r($createdWebhook['error'], true));
-    }
-
-    $createdWebhook = $client->createWebhook('PAYMENT_FAILED', $webhookUrl);
-
-    if (array_key_exists("error", $createdWebhook)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhooks ' . wc_print_r($createdWebhook['error'], true));
-    }
-
-    $createdWebhook = $client->createWebhook('PAYMENT_EXPIRED', $webhookUrl);
-
-    if (array_key_exists("error", $createdWebhook)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhooks ' . wc_print_r($createdWebhook['error'], true));
-    }
-
-    $createdWebhook = $client->createWebhook('PAYMENT_CANCELLED', $webhookUrl);
-
-    if (array_key_exists("error", $createdWebhook)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhooks ' . wc_print_r($createdWebhook['error'], true));
+        if (array_key_exists("error", $createdWebhook)) {
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error creating webhook ' . $webhookName . ' ' . wc_print_r($createdWebhook['error'], true));
+        }
     }
 }
 

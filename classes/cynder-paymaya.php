@@ -30,13 +30,17 @@ define('CYNDER_PAYMAYA_AFTER_TOTALS_BLOCK', 'After Order Totals');
 define('CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT', 'createCheckout');
 define('CYNDER_PAYMAYA_VOID_PAYMENT_EVENT', 'voidPayment');
 define('CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT', 'refundPayment');
-define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array(
-    'CHECKOUT_SUCCESS',
-    'CHECKOUT_FAILURE',
+/** Payment webhooks, all delivered to the payment status URL. */
+define('CYNDER_PAYMAYA_PAYMENT_WEBHOOKS', array(
     'PAYMENT_SUCCESS',
     'PAYMENT_FAILED',
     'PAYMENT_EXPIRED',
     'PAYMENT_CANCELLED',
+));
+/** Every webhook the plugin registers, and so the only ones it may delete on the Maya account. */
+define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array_merge(
+    array('CHECKOUT_SUCCESS', 'CHECKOUT_FAILURE'),
+    CYNDER_PAYMAYA_PAYMENT_WEBHOOKS
 ));
 
 define('MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX', array(
@@ -495,40 +499,21 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     }
                 }
     
-                $createdWebhook = $this->client->createWebhook('CHECKOUT_SUCCESS', $webhookSuccessUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('CHECKOUT_FAILURE',$webhookFailureUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('PAYMENT_SUCCESS', $webhookPaymentUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('PAYMENT_FAILED', $webhookPaymentUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
+                $webhookUrls = array(
+                    'CHECKOUT_SUCCESS' => $webhookSuccessUrl,
+                    'CHECKOUT_FAILURE' => $webhookFailureUrl,
+                );
+
+                foreach (CYNDER_PAYMAYA_PAYMENT_WEBHOOKS as $webhookName) {
+                    $webhookUrls[$webhookName] = $webhookPaymentUrl;
                 }
 
-                $createdWebhook = $this->client->createWebhook('PAYMENT_CANCELLED', $webhookPaymentUrl);
+                foreach ($webhookUrls as $webhookName => $webhookUrl) {
+                    $createdWebhook = $this->client->createWebhook($webhookName, $webhookUrl);
 
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
+                    if (array_key_exists("error", $createdWebhook)) {
+                        $this->process_error($createdWebhook);
+                    }
                 }
             }
 
