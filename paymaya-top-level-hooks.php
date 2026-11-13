@@ -347,14 +347,22 @@ function update_paymaya_plugin() {
 
     $client = new Cynder_PaymayaClient($isSandbox, $publicKey, $secretKey);
 
-    $webhooks = $client->retrieveWebhooks();
+    $webhookUrl = isset($mainPluginSettings['webhook_payment_status']) ? $mainPluginSettings['webhook_payment_status'] : home_url( '/?wc-api=cynder_paymaya_payment' );
+
+    if (!empty(Cynder_Paymaya_Webhook_Guard::invalid_webhook_urls(array('payment status' => $webhookUrl)))) {
+        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Webhook URL is not valid, leaving webhooks unchanged');
+        return;
+    }
+
+    $listResponse = $client->retrieveWebhooks();
+    $webhooks = Cynder_Paymaya_Webhook_Guard::webhook_list($listResponse);
 
     if (isset($mainPluginSettings['debug_mode']) && $mainPluginSettings['debug_mode'] === 'yes') {
         wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] ' . wc_print_r($webhooks, true));
     }
 
-    if (array_key_exists("error", $webhooks)) {
-        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error retrieving webhooks ' . wc_print_r($webhooks['error'], true));
+    if ($webhooks === null) {
+        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error retrieving webhooks ' . Cynder_Paymaya_Webhook_Guard::error_message($listResponse));
         return;
     }
 
@@ -370,8 +378,6 @@ function update_paymaya_plugin() {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_UPDATE_EVENT . '] Error deleting webhooks ' . wc_print_r($deletedWebhook['error'], true));
         }
     }
-
-    $webhookUrl = isset($mainPluginSettings['webhook_payment_status']) ? $mainPluginSettings['webhook_payment_status'] : home_url( '/?wc-api=cynder_paymaya_payment' );
 
     foreach (CYNDER_PAYMAYA_PAYMENT_WEBHOOKS as $webhookName) {
         $createdWebhook = $client->createWebhook($webhookName, $webhookUrl);

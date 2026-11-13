@@ -493,47 +493,66 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $webhookPaymentUrl = $this->get_option('webhook_payment_status');
 
         if ($this->enabled === 'yes' && $this->public_key !== '' && $this->secret_key !== '') {
-            $webhooks = $this->client->retrieveWebhooks();
+            $webhookUrls = array(
+                'CHECKOUT_SUCCESS' => $webhookSuccessUrl,
+                'CHECKOUT_FAILURE' => $webhookFailureUrl,
+            );
 
-            if (array_key_exists("error", $webhooks)) {
-                $this->process_error($webhooks);
+            foreach (CYNDER_PAYMAYA_PAYMENT_WEBHOOKS as $webhookName) {
+                $webhookUrls[$webhookName] = $webhookPaymentUrl;
+            }
+
+            /**
+             * Registration deletes the existing webhooks and then creates new ones, so check the URLs first. Otherwise
+             * an unusable URL leaves the account with no webhooks and paid orders stay pending.
+             */
+            $invalidUrls = Cynder_Paymaya_Webhook_Guard::invalid_webhook_urls($webhookUrls);
+
+            if (!empty($invalidUrls)) {
+                $this->add_error('Maya: webhooks were not changed because these URLs are not valid web addresses (they must start with http:// or https://): ' . implode(', ', $invalidUrls) . '. Fix them and save again.');
             } else {
-                if ($this->debug_mode) {
-                    wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
-                }
+                $listResponse = $this->client->retrieveWebhooks();
+                $webhooks = Cynder_Paymaya_Webhook_Guard::webhook_list($listResponse);
 
-                wc_get_logger()->log('info', 'valid webhooks: ' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
-    
-                foreach($webhooks as $webhook) {
-                    /**
-                     * Only override webhook names that are being used by the plugin, disregard the rest
-                     */
-    
-                    wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
-    
-                    if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS)) {
-                        $deletedWebhook = $this->client->deleteWebhook($webhook["id"]);
-    
-                        if (array_key_exists("error", $deletedWebhook)) {
-                            $this->process_error($deletedWebhook);
+                if ($webhooks === null) {
+                    $this->process_error($listResponse);
+                } else {
+                    if ($this->debug_mode) {
+                        wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
+                    }
+
+                    wc_get_logger()->log('info', 'valid webhooks: ' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
+
+                    foreach ($webhooks as $webhook) {
+                        if (!is_array($webhook) || !isset($webhook['id'], $webhook['name'])) {
+                            continue;
+                        }
+
+                        wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
+
+                        /** Only override webhook names that are being used by the plugin, disregard the rest. */
+                        if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true)) {
+                            $deletedWebhook = $this->client->deleteWebhook($webhook['id']);
+
+                            if (array_key_exists("error", $deletedWebhook)) {
+                                $this->process_error($deletedWebhook);
+                            }
                         }
                     }
-                }
-    
-                $webhookUrls = array(
-                    'CHECKOUT_SUCCESS' => $webhookSuccessUrl,
-                    'CHECKOUT_FAILURE' => $webhookFailureUrl,
-                );
 
-                foreach (CYNDER_PAYMAYA_PAYMENT_WEBHOOKS as $webhookName) {
-                    $webhookUrls[$webhookName] = $webhookPaymentUrl;
-                }
+                    $failedWebhooks = array();
 
-                foreach ($webhookUrls as $webhookName => $webhookUrl) {
-                    $createdWebhook = $this->client->createWebhook($webhookName, $webhookUrl);
+                    foreach ($webhookUrls as $webhookName => $webhookUrl) {
+                        $createdWebhook = $this->client->createWebhook($webhookName, $webhookUrl);
 
-                    if (array_key_exists("error", $createdWebhook)) {
-                        $this->process_error($createdWebhook);
+                        if (array_key_exists("error", $createdWebhook)) {
+                            $failedWebhooks[] = $webhookName;
+                            $this->process_error($createdWebhook);
+                        }
+                    }
+
+                    if (!empty($failedWebhooks)) {
+                        $this->add_error('Maya: these webhooks could not be registered, so paid orders may stay "Pending payment" until you fix the error above and save again: ' . implode(', ', $failedWebhooks) . '.');
                     }
                 }
             }

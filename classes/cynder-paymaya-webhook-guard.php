@@ -533,6 +533,53 @@ class Cynder_Paymaya_Webhook_Guard {
         return array('failed', 'Payment failed');
     }
 
+    /**
+     * The list of webhooks from a client response, or null when the request really failed.
+     *
+     * Maya answers "list webhooks" with error PY0038 ("Webhook does not exist.") when the account has none. That is
+     * an empty list, not a failure; treating it as a failure meant that once every webhook was gone, saving the
+     * settings could never register them again.
+     *
+     * @return array|null
+     */
+    public static function webhook_list($response) {
+        if (!is_array($response)) {
+            return null;
+        }
+
+        if (array_key_exists('error', $response)) {
+            $error = $response['error'];
+
+            return is_array($error) && isset($error['code']) && (string) $error['code'] === 'PY0038' ? array() : null;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Names of webhooks whose callback URL Maya would reject: empty, not http(s), or not a valid URL. Checked before
+     * any API call, because registration deletes the existing webhooks first and then creates the new ones.
+     *
+     * @param array $urls Webhook name => URL.
+     * @return array Names with an unusable URL.
+     */
+    public static function invalid_webhook_urls(array $urls) {
+        $invalid = array();
+
+        foreach ($urls as $name => $url) {
+            $valid = is_string($url)
+                && $url === trim($url)
+                && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), array('http', 'https'), true);
+
+            if (!$valid) {
+                $invalid[] = $name;
+            }
+        }
+
+        return $invalid;
+    }
+
     /** Keys whose values are buyer personal data or order secrets; masked in debug logs. */
     const REDACTED_KEYS = array(
         'firstName', 'lastName', 'email', 'phone', 'line1', 'line2', 'zipCode',

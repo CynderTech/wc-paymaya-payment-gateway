@@ -67,6 +67,8 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 * If the payment webhook does not arrive, the order is re-checked with Maya 75 minutes after the customer returns from checkout.
 * Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified). The `cynder_paymaya_skip_webhook_ip_check` filter can turn it back on.
 * New `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
+* Fix: saving the settings can register webhooks again when your Maya account has none. Previously Maya's "Webhook does not exist" reply to the list request was treated as a failure, so webhooks were never re-created and paid orders stayed "Pending payment".
+* Fix: webhook URLs are checked before anything is changed. An invalid URL used to delete the existing webhooks and then fail to create new ones; now nothing is touched and you are told which URLs to fix. If Maya rejects the new webhooks you are told which ones, so you know orders will not update.
 * Fix: if Maya rejects a checkout request, the customer now sees a message instead of a blank failure.
 * Fix: Maya order screens no longer look up payments for orders paid with other gateways, so Void and Capture controls only appear on Maya orders.
 * Fix: refunds, voids and captures act only on the payment recorded for the order, even if another payment shares its reference number, and report an error when it is not found.
