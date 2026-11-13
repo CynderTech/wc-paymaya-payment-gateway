@@ -262,12 +262,21 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 'type'        => 'maya_key',
                 'constant'    => 'CYNDER_PAYMAYA_PUBLIC_KEY',
             ),
+            /**
+             * To keep the keys out of the database, define them in wp-config.php instead:
+             *
+             *     define('CYNDER_PAYMAYA_PUBLIC_KEY', 'pk-...');
+             *     define('CYNDER_PAYMAYA_SECRET_KEY', 'sk-...');
+             *
+             * A defined constant wins over the saved value and locks its field. The next settings save then removes
+             * any copy already in the database. See get_api_keys() and validate_maya_key_field().
+             */
             'secret_key' => array(
                 'title'       => 'Secret Key',
                 'type'        => 'maya_key',
                 'constant'    => 'CYNDER_PAYMAYA_SECRET_KEY',
                 'secret'      => true,
-                'description' => 'Stored in the database unless set in wp-config.php with <code>define(\'CYNDER_PAYMAYA_SECRET_KEY\', \'...\');</code> (recommended). The saved key is never shown; leave this blank to keep it. After adding the constants, save these settings once so any copy already in the database is removed.',
+                'description' => 'Leave blank to keep your saved key. It is never shown again.',
             ),
             'webhook_title' => array(
                 'title' => 'Webhooks',
