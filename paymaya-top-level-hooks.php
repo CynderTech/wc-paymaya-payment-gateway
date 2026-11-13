@@ -293,9 +293,12 @@ function cynder_paymaya_catch_redirect() {
         /**
          * Safety net if the payment webhook never arrives (endpoint unreachable, blocked, misconfigured). Maya retries
          * a failed webhook at 0, 5, 15 and 45 minutes (about 65 minutes in all), so re-check once that window has
-         * passed. A no-op if the webhook already completed the order.
+         * passed. A no-op if the webhook already completed the order. Skipped for manual-capture orders, which stay
+         * unpaid after authorization until the final capture, so the re-check would only add a misleading note.
          */
-        if (!$order->is_paid() && $order->get_payment_method() === $paymentGatewaId) {
+        $authorizationType = $order->get_meta($paymentGatewaId . '_authorization_type');
+
+        if (!$order->is_paid() && $order->get_payment_method() === $paymentGatewaId && (empty($authorizationType) || $authorizationType === 'none')) {
             $paymayaGateway->schedule_reconcile($order, 1, 75 * MINUTE_IN_SECONDS);
         }
 
@@ -367,8 +370,12 @@ function update_paymaya_plugin() {
     }
 
     foreach($webhooks as $webhook) {
-        /** Only replace the webhooks this plugin manages; others on the Maya account may belong to other integrations. */
-        if (!is_array($webhook) || !isset($webhook['id'], $webhook['name']) || !in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true)) {
+        /**
+         * Only replace the webhooks this path recreates (the payment webhooks). Others on the Maya account may belong
+         * to other integrations, and CHECKOUT_SUCCESS / CHECKOUT_FAILURE are only registered on a settings save, so
+         * deleting them here would leave them missing.
+         */
+        if (!is_array($webhook) || !isset($webhook['id'], $webhook['name']) || !in_array($webhook['name'], CYNDER_PAYMAYA_PAYMENT_WEBHOOKS, true)) {
             continue;
         }
 
