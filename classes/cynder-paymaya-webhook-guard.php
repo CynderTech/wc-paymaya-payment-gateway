@@ -390,4 +390,221 @@ class Cynder_Paymaya_Webhook_Guard {
 
         return array(count($confirmed) > 1 ? 'ambiguous' : 'mismatch', null);
     }
+
+    /**
+     * Human-readable text for a client response that carries an 'error', whatever its shape: a string (transport
+     * failure, non-JSON body), an object with 'error' or 'message', or something else entirely. Callers log it,
+     * show it to an admin or compare it as a string, none of which are safe on an array or null (TypeError on PHP 8).
+     */
+    public static function error_message($response, $fallback = 'Unexpected response from Maya.') {
+        $error = is_array($response) && array_key_exists('error', $response) ? $response['error'] : $response;
+
+        if (is_string($error) && $error !== '') {
+            return $error;
+        }
+
+        if (is_array($error)) {
+            foreach (array('error', 'message') as $key) {
+                if (isset($error[$key]) && is_string($error[$key]) && $error[$key] !== '') {
+                    return $error[$key];
+                }
+            }
+
+            if (isset($error['code']) && is_scalar($error['code']) && $error['code'] !== '') {
+                return 'Maya error code ' . $error['code'];
+            }
+        }
+
+        return $fallback;
+    }
+
+    /**
+     * The payment to act on for an order out of several Maya payments sharing its reference number.
+     *
+     * Reference numbers are just the WooCommerce order id, so other sites on the same Maya account (or a shared
+     * sandbox) can produce look-alikes. When the order recorded a payment id (every order completed by this plugin
+     * has one) only that payment is acceptable: if it is not among the candidates, return null instead of guessing,
+     * because the caller is about to refund, void or capture real money. Only when no id was recorded (e.g. a
+     * manual-capture order not yet fully captured) fall back to the first valid payment.
+     *
+     * @return array|null
+     */
+    public static function pick_payment(array $payments, $transactionId) {
+        $payments = array_values(array_filter($payments, 'is_array'));
+
+        if (is_string($transactionId) && $transactionId !== '') {
+            foreach ($payments as $payment) {
+                if (isset($payment['id']) && (string) $payment['id'] === $transactionId) {
+                    return $payment;
+                }
+            }
+
+            return null;
+        }
+
+        foreach ($payments as $payment) {
+            if (isset($payment['id'])) {
+                return $payment;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * API keys to use: a defined constant wins over the saved setting. Pure; the gateway passes defined() values in.
+     *
+     * @param array       $settings       Saved gateway settings.
+     * @param string|null $publicConstant Value of CYNDER_PAYMAYA_PUBLIC_KEY, or null when not defined.
+     * @param string|null $secretConstant Value of CYNDER_PAYMAYA_SECRET_KEY, or null when not defined.
+     * @return array [public key, secret key]
+     */
+    public static function resolve_api_keys($settings, $publicConstant, $secretConstant) {
+        $settings = is_array($settings) ? $settings : array();
+
+        $public = $publicConstant !== null ? (string) $publicConstant : (isset($settings['public_key']) ? (string) $settings['public_key'] : '');
+        $secret = $secretConstant !== null ? (string) $secretConstant : (isset($settings['secret_key']) ? (string) $settings['secret_key'] : '');
+
+        return array($public, $secret);
+    }
+
+    /**
+     * Value to store for an API key field on save.
+     *
+     * - A key defined by constant is stored as '' so the copy in the database is wiped on the next save.
+     * - A secret field left blank keeps the saved secret (the field never shows it); "remove" clears it only
+     *   when the field is blank, a typed key wins.
+     * - Anything else is the posted value, trimmed.
+     */
+    public static function resolve_key_field($posted, $saved, $isSecret, $constantDefined, $remove = false) {
+        if ($constantDefined) {
+            return '';
+        }
+
+        $posted = is_string($posted) ? trim($posted) : '';
+
+        if ($posted === '' && $isSecret) {
+            // Blank keeps the saved secret unless "remove" was ticked. A typed key always wins over "remove",
+            // so someone who ticks it meaning "replace" does not end up with no key.
+            return $remove ? '' : (string) $saved;
+        }
+
+        return $posted;
+    }
+
+    /** Whether a key value has the prefix Maya issues (pk- for public, sk- for secret keys). */
+    public static function key_looks_valid($value, $isSecret) {
+        return is_string($value) && strpos($value, $isSecret ? 'sk-' : 'pk-') === 0;
+    }
+
+    /** Webhook statuses that mean the payment did not go through. */
+    const FAILURE_STATUSES = array('PAYMENT_FAILED', 'PAYMENT_EXPIRED', 'PAYMENT_CANCELLED', 'AUTH_FAILED');
+
+    /**
+     * What to do with an order for a payment webhook status that is not a success.
+     *
+     * @param string $status          Webhook status.
+     * @param bool   $isPaid          Whether the order is already paid; a failure webhook must never change it.
+     * @param bool   $isManualCapture Whether the order uses authorize-and-capture.
+     * @return array [action, note]. action: 'none' (not a failure status), 'ignore' (order already paid),
+     *               'failed' (normal orders: mark failed so the customer can retry) or 'on-hold' (manual capture).
+     */
+    public static function failure_decision($status, $isPaid, $isManualCapture) {
+        if (!in_array($status, self::FAILURE_STATUSES, true)) {
+            return array('none', '');
+        }
+
+        if ($isPaid) {
+            return array('ignore', '');
+        }
+
+        if ($isManualCapture) {
+            return array('on-hold', 'Failed payment');
+        }
+
+        if ($status === 'PAYMENT_EXPIRED') {
+            return array('failed', 'Payment expired');
+        }
+
+        if ($status === 'PAYMENT_CANCELLED') {
+            return array('failed', 'Payment cancelled');
+        }
+
+        return array('failed', 'Payment failed');
+    }
+
+    /**
+     * The list of webhooks from a client response, or null when the request really failed.
+     *
+     * Maya answers "list webhooks" with error PY0038 ("Webhook does not exist.") when the account has none. That is
+     * an empty list, not a failure; treating it as a failure meant that once every webhook was gone, saving the
+     * settings could never register them again.
+     *
+     * @return array|null
+     */
+    public static function webhook_list($response) {
+        if (!is_array($response)) {
+            return null;
+        }
+
+        if (array_key_exists('error', $response)) {
+            $error = $response['error'];
+
+            return is_array($error) && isset($error['code']) && (string) $error['code'] === 'PY0038' ? array() : null;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Names of webhooks whose callback URL Maya would reject: empty, not http(s), or not a valid URL. Checked before
+     * any API call, because registration deletes the existing webhooks first and then creates the new ones.
+     *
+     * @param array $urls Webhook name => URL.
+     * @return array Names with an unusable URL.
+     */
+    public static function invalid_webhook_urls(array $urls) {
+        $invalid = array();
+
+        foreach ($urls as $name => $url) {
+            $valid = is_string($url)
+                && $url === trim($url)
+                && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array(strtolower((string) parse_url($url, PHP_URL_SCHEME)), array('http', 'https'), true);
+
+            if (!$valid) {
+                $invalid[] = $name;
+            }
+        }
+
+        return $invalid;
+    }
+
+    /** Keys whose values are buyer personal data or order secrets; masked in debug logs. */
+    const REDACTED_KEYS = array(
+        'firstName', 'lastName', 'email', 'phone', 'line1', 'line2', 'zipCode',
+        'description', 'paymentTokenId', 'key',
+        // Further buyer and card fields Maya can return or accept.
+        'middleName', 'birthday', 'ipAddress', 'first6', 'masked',
+    );
+
+    /**
+     * Copy of $data with personal data masked, for debug logging. Structure and other values are kept so logs
+     * stay useful. Maya puts the buyer's email in a payment's description ("Charge for ..."), so that is masked too.
+     */
+    public static function redact_for_log($data) {
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $data[$key] = self::redact_for_log($value);
+            } elseif (is_string($key) && in_array($key, self::REDACTED_KEYS, true) && $value !== null && $value !== '') {
+                $data[$key] = '[redacted]';
+            }
+        }
+
+        return $data;
+    }
 }

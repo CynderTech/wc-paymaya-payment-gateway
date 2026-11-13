@@ -30,12 +30,17 @@ define('CYNDER_PAYMAYA_AFTER_TOTALS_BLOCK', 'After Order Totals');
 define('CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT', 'createCheckout');
 define('CYNDER_PAYMAYA_VOID_PAYMENT_EVENT', 'voidPayment');
 define('CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT', 'refundPayment');
-define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array(
-    'CHECKOUT_SUCCESS',
-    'CHECKOUT_FAILURE',
+/** Payment webhooks, all delivered to the payment status URL. */
+define('CYNDER_PAYMAYA_PAYMENT_WEBHOOKS', array(
     'PAYMENT_SUCCESS',
     'PAYMENT_FAILED',
     'PAYMENT_EXPIRED',
+    'PAYMENT_CANCELLED',
+));
+/** Every webhook the plugin registers, and so the only ones it may delete on the Maya account. */
+define('CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS', array_merge(
+    array('CHECKOUT_SUCCESS', 'CHECKOUT_FAILURE'),
+    CYNDER_PAYMAYA_PAYMENT_WEBHOOKS
 ));
 
 define('MAYA_WEBHOOK_PUBLIC_KEYS_SANDBOX', array(
@@ -128,18 +133,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         $this->init_settings();
 
-        $this->enabled = $this->get_option('enabled');
-        $this->title = $this->get_option('title');
-        $this->description = $this->get_option('description');
-        $this->manual_capture = $this->get_option('manual_capture');
-        $this->sandbox = $this->get_option('sandbox');
-        $this->secret_key = $this->get_option('secret_key');
-        $this->public_key = $this->get_option('public_key');
-        $this->webhook_success = $this->get_option('webhook_success');
-        $this->webhook_failure = $this->get_option('webhook_failure');
-        
-        $debugMode = $this->get_option('debug_mode');
-        $this->debug_mode = !empty($debugMode) && $debugMode === 'yes';
+        $this->load_settings();
 
         add_action(
             'woocommerce_update_options_payment_gateways_' . $this->id,
@@ -172,8 +166,41 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'woocommerce_admin_order_data_after_shipping_address',
             array($this, 'wc_paymaya_webhook_labels')
         );
+    }
+
+    /**
+     * Read settings into properties and build the API client. Called again after the settings are saved,
+     * so webhooks are registered with the keys just entered rather than the previous ones.
+     */
+    private function load_settings() {
+        $this->enabled = $this->get_option('enabled');
+        $this->title = $this->get_option('title');
+        $this->description = $this->get_option('description');
+        $this->manual_capture = $this->get_option('manual_capture');
+        $this->sandbox = $this->get_option('sandbox');
+        $this->webhook_success = $this->get_option('webhook_success');
+        $this->webhook_failure = $this->get_option('webhook_failure');
+
+        list($this->public_key, $this->secret_key) = self::get_api_keys($this->settings);
+
+        $debugMode = $this->get_option('debug_mode');
+        $this->debug_mode = !empty($debugMode) && $debugMode === 'yes';
 
         $this->client = new Cynder_PaymayaClient($this->sandbox === 'yes', $this->public_key, $this->secret_key);
+    }
+
+    /**
+     * API keys to use: the CYNDER_PAYMAYA_PUBLIC_KEY / CYNDER_PAYMAYA_SECRET_KEY constants when defined
+     * (e.g. in wp-config.php, keeping the secret out of the database), otherwise the saved settings.
+     *
+     * @return array [public key, secret key]
+     */
+    public static function get_api_keys($settings) {
+        return Cynder_Paymaya_Webhook_Guard::resolve_api_keys(
+            $settings,
+            defined('CYNDER_PAYMAYA_PUBLIC_KEY') ? CYNDER_PAYMAYA_PUBLIC_KEY : null,
+            defined('CYNDER_PAYMAYA_SECRET_KEY') ? CYNDER_PAYMAYA_SECRET_KEY : null
+        );
     }
 
     /**
@@ -232,11 +259,24 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             ),
             'public_key' => array(
                 'title'       => 'Public Key',
-                'type'        => 'text',
+                'type'        => 'maya_key',
+                'constant'    => 'CYNDER_PAYMAYA_PUBLIC_KEY',
             ),
+            /**
+             * To keep the keys out of the database, define them in wp-config.php instead:
+             *
+             *     define('CYNDER_PAYMAYA_PUBLIC_KEY', 'pk-...');
+             *     define('CYNDER_PAYMAYA_SECRET_KEY', 'sk-...');
+             *
+             * A defined constant wins over the saved value and locks its field. The next settings save then removes
+             * any copy already in the database. See get_api_keys() and validate_maya_key_field().
+             */
             'secret_key' => array(
                 'title'       => 'Secret Key',
-                'type'        => 'text'
+                'type'        => 'maya_key',
+                'constant'    => 'CYNDER_PAYMAYA_SECRET_KEY',
+                'secret'      => true,
+                'description' => 'Leave blank to keep your saved key. It is never shown again.',
             ),
             'webhook_title' => array(
                 'title' => 'Webhooks',
@@ -285,7 +325,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             'debug_mode' => array(
                 'title' => 'Debug Mode',
                 'type' => 'checkbox', 
-                'description' => 'Enables debug mode. Produces more verbose logs for most of the plugin processes. Helpful when coordinating with customer support.',
+                'description' => 'Enables debug mode. Produces more verbose logs for most of the plugin processes. Helpful when coordinating with customer support.<br/>Buyer names, emails, phone numbers and addresses are masked in these logs, but they still contain order and payment details. <strong>Turn this off when you are done.</strong>',
                 'default' => 'no',
             ),
             'require_billing_address_2' => array(
@@ -302,13 +342,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             wc_get_logger()->log('error', '[Registering Webhooks] ' . wc_print_r($response, true));
         }
 
-        if (isset($response["error"]["error"])) {
-            $this->add_error($response["error"]["error"]);
-        } else if (isset($response["error"]["message"])) {
-            $this->add_error($response["error"]["message"]);
-        } else {
-            $this->add_error($response["error"]);
-        }
+        $this->add_error(Cynder_Paymaya_Webhook_Guard::error_message($response));
     }
 
     /**
@@ -336,6 +370,96 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
     }
 
+    /**
+     * API key field. Locked when the key comes from a wp-config.php constant. A secret field is masked and never
+     * echoes the saved value back into the page; it shows only the last 4 characters as a hint.
+     */
+    public function generate_maya_key_html($key, $data) {
+        $data = wp_parse_args($data, array('title' => '', 'description' => '', 'desc_tip' => false));
+        $fieldKey = $this->get_field_key($key);
+        $constant = isset($data['constant']) ? $data['constant'] : '';
+        $isSecret = !empty($data['secret']);
+        $fromConstant = $constant !== '' && defined($constant);
+        $saved = (string) $this->get_option($key);
+
+        $value = $isSecret ? '' : $saved;
+        $placeholder = '';
+
+        if ($fromConstant) {
+            $value = '';
+            $placeholder = (string) constant($constant) === ''
+                ? $constant . ' is defined in wp-config.php but empty, so no key is set'
+                : 'Set in wp-config.php (' . $constant . ')' . ($saved !== '' ? '. Save to remove the copy in the database.' : '');
+        } elseif ($isSecret && $saved !== '') {
+            $placeholder = 'Saved key ending in ' . substr($saved, -4) . '. Leave blank to keep it.';
+        }
+
+        // Browsers ignore autocomplete="off" on password fields and may autofill the admin's own password here,
+        // which a save would then store as the secret key. new-password tells them not to.
+        $autocomplete = $isSecret ? 'new-password' : 'off';
+
+        ob_start();
+        ?>
+        <tr valign="top">
+            <th scope="row" class="titledesc">
+                <label for="<?php echo esc_attr($fieldKey); ?>"><?php echo wp_kses_post($data['title']); ?></label>
+            </th>
+            <td class="forminp">
+                <fieldset>
+                    <legend class="screen-reader-text"><span><?php echo wp_kses_post($data['title']); ?></span></legend>
+                    <input class="input-text regular-input" type="<?php echo $isSecret ? 'password' : 'text'; ?>" name="<?php echo esc_attr($fieldKey); ?>" id="<?php echo esc_attr($fieldKey); ?>" value="<?php echo esc_attr($value); ?>" placeholder="<?php echo esc_attr($placeholder); ?>" autocomplete="<?php echo esc_attr($autocomplete); ?>" <?php disabled($fromConstant, true); ?> />
+                    <?php if ($isSecret && !$fromConstant && $saved !== '') : ?>
+                        <label style="display:block;margin-top:4px;"><input type="checkbox" name="<?php echo esc_attr($fieldKey); ?>_remove" value="1" /> Remove the saved key</label>
+                    <?php endif; ?>
+                    <?php echo $this->get_description_html($data); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                </fieldset>
+            </td>
+        </tr>
+        <?php
+
+        return ob_get_clean();
+    }
+
+    /**
+     * A key defined by constant is stored as empty (wiping the database copy), a blank secret keeps the saved one,
+     * "Remove the saved key" clears it. A value without Maya's key prefix is still saved but flagged, since the
+     * usual cause is a browser autofilling the wrong field.
+     */
+    public function validate_maya_key_field($key, $value) {
+        $field = isset($this->form_fields[$key]) ? $this->form_fields[$key] : array();
+        $isSecret = !empty($field['secret']);
+        $saved = (string) $this->get_option($key);
+        $constantDefined = !empty($field['constant']) && defined($field['constant']);
+
+        $postData = $this->get_post_data();
+        $remove = !empty($postData[$this->get_field_key($key) . '_remove']);
+
+        $posted = is_null($value) ? '' : sanitize_text_field(wp_unslash($value));
+        $result = Cynder_Paymaya_Webhook_Guard::resolve_key_field($posted, $saved, $isSecret, $constantDefined, $remove);
+
+        if ($constantDefined && (string) constant($field['constant']) === '') {
+            $emptyMessage = 'Maya: ' . $field['constant'] . ' is defined in wp-config.php but empty (for example a missing environment variable), so no ' . ($isSecret ? 'secret' : 'public') . ' key is set.';
+
+            if (class_exists('WC_Admin_Settings')) {
+                WC_Admin_Settings::add_error($emptyMessage);
+            } else {
+                $this->add_error($emptyMessage);
+            }
+        }
+
+        if ($result !== '' && $result !== $saved && !Cynder_Paymaya_Webhook_Guard::key_looks_valid($result, $isSecret)) {
+            $message = 'Maya: the ' . ($isSecret ? 'Secret' : 'Public') . ' Key does not start with "' . ($isSecret ? 'sk-' : 'pk-') . '". Check that you pasted the right key; browsers sometimes autofill these fields with a different value.';
+
+            if (class_exists('WC_Admin_Settings')) {
+                WC_Admin_Settings::add_error($message);
+            } else {
+                $this->add_error($message);
+            }
+        }
+
+        return $result;
+    }
+
     /** Keep only valid IPs/CIDRs and tell the merchant about the rest, instead of silently ignoring them. */
     public function validate_trusted_proxy_ips_field($key, $value) {
         $value = is_null($value) ? '' : wp_unslash($value);
@@ -361,66 +485,75 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             delete_option(self::SOURCE_REJECTED_OPTION);
         }
 
+        /** The gateway was built before the save; pick up the new values (keys, sandbox) before calling Maya. */
+        $this->load_settings();
+
         $webhookSuccessUrl = $this->get_option('webhook_success');
         $webhookFailureUrl = $this->get_option('webhook_failure');
         $webhookPaymentUrl = $this->get_option('webhook_payment_status');
 
-        if (isset($this->enabled) && $this->enabled === 'yes' && isset($this->public_key) && isset($this->secret_key)) {
-            $webhooks = $this->client->retrieveWebhooks();
+        if ($this->enabled === 'yes' && $this->public_key !== '' && $this->secret_key !== '') {
+            $webhookUrls = array(
+                'CHECKOUT_SUCCESS' => $webhookSuccessUrl,
+                'CHECKOUT_FAILURE' => $webhookFailureUrl,
+            );
 
-            if (array_key_exists("error", $webhooks)) {
-                $this->process_error($webhooks);
+            foreach (CYNDER_PAYMAYA_PAYMENT_WEBHOOKS as $webhookName) {
+                $webhookUrls[$webhookName] = $webhookPaymentUrl;
+            }
+
+            /**
+             * Registration deletes the existing webhooks and then creates new ones, so check the URLs first. Otherwise
+             * an unusable URL leaves the account with no webhooks and paid orders stay pending.
+             */
+            $invalidUrls = Cynder_Paymaya_Webhook_Guard::invalid_webhook_urls($webhookUrls);
+
+            if (!empty($invalidUrls)) {
+                $this->add_error('Maya: webhooks were not changed because these URLs are not valid web addresses (they must start with http:// or https://): ' . implode(', ', $invalidUrls) . '. Fix them and save again.');
             } else {
-                if ($this->debug_mode) {
-                    wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
-                }
+                $listResponse = $this->client->retrieveWebhooks();
+                $webhooks = Cynder_Paymaya_Webhook_Guard::webhook_list($listResponse);
 
-                wc_get_logger()->log('info', 'valid webhooks: ' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
-    
-                foreach($webhooks as $webhook) {
-                    /**
-                     * Only override webhook names that are being used by the plugin, disregard the rest
-                     */
-    
-                    wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
-    
-                    if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS)) {
-                        $deletedWebhook = $this->client->deleteWebhook($webhook["id"]);
-    
-                        if (array_key_exists("error", $deletedWebhook)) {
-                            $this->process_error($deletedWebhook);
+                if ($webhooks === null) {
+                    $this->process_error($listResponse);
+                } else {
+                    if ($this->debug_mode) {
+                        wc_get_logger()->log('info', '[Registering Webhooks] ' . wc_print_r($webhooks, true));
+                    }
+
+                    wc_get_logger()->log('info', 'valid webhooks: ' . wc_print_r(CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true));
+
+                    foreach ($webhooks as $webhook) {
+                        if (!is_array($webhook) || !isset($webhook['id'], $webhook['name'])) {
+                            continue;
+                        }
+
+                        wc_get_logger()->log('info', 'Webhook name ' . $webhook['name']);
+
+                        /** Only override webhook names that are being used by the plugin, disregard the rest. */
+                        if (in_array($webhook['name'], CYNDER_PAYMAYA_OVERRIDABLE_WEBHOOKS, true)) {
+                            $deletedWebhook = $this->client->deleteWebhook($webhook['id']);
+
+                            if (array_key_exists("error", $deletedWebhook)) {
+                                $this->process_error($deletedWebhook);
+                            }
                         }
                     }
-                }
-    
-                $createdWebhook = $this->client->createWebhook('CHECKOUT_SUCCESS', $webhookSuccessUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('CHECKOUT_FAILURE',$webhookFailureUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('PAYMENT_SUCCESS', $webhookPaymentUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('PAYMENT_FAILED', $webhookPaymentUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
-                }
-    
-                $createdWebhook = $this->client->createWebhook('PAYMENT_EXPIRED', $webhookPaymentUrl);
-    
-                if (array_key_exists("error", $createdWebhook)) {
-                    $this->process_error($createdWebhook);
+
+                    $failedWebhooks = array();
+
+                    foreach ($webhookUrls as $webhookName => $webhookUrl) {
+                        $createdWebhook = $this->client->createWebhook($webhookName, $webhookUrl);
+
+                        if (array_key_exists("error", $createdWebhook)) {
+                            $failedWebhooks[] = $webhookName;
+                            $this->process_error($createdWebhook);
+                        }
+                    }
+
+                    if (!empty($failedWebhooks)) {
+                        $this->add_error('Maya: these webhooks could not be registered, so paid orders may stay "Pending payment" until you fix the error above and save again: ' . implode(', ', $failedWebhooks) . '.');
+                    }
                 }
             }
 
@@ -524,7 +657,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $encodedPayload = json_encode($payload);
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '] Payload' . wc_print_r($encodedPayload, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '] Payload' . wc_print_r(json_encode(Cynder_Paymaya_Webhook_Guard::redact_for_log($payload)), true));
         }
 
         $response = $this->client->createCheckout($encodedPayload);
@@ -535,7 +668,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
         if (array_key_exists("error", $response)) {
             wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_PAYMENT_BLOCK . '][' . CYNDER_PAYMAYA_CREATE_CHECKOUT_EVENT . '] ' . json_encode($response['error']));
-            return null;
+
+            /** WooCommerce shows only what is in the notices; without one the customer sees a failed checkout with no explanation. */
+            wc_add_notice(__('We could not start your Maya payment. Please try again, or choose another payment method.', 'wc-paymaya-payment-gateway'), 'error');
+
+            return array('result' => 'failure');
         }
 
         $existingCheckout = $order->get_meta($this->id . '_checkout_id');
@@ -559,14 +696,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
             return false;
         }
 
         $amountValue = floatval($amount);
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] Payments via RRN ' . wc_print_r($payments, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
         }
 
         $authorizationType = $order->get_meta($this->id . '_authorization_type');
@@ -589,28 +726,31 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 )
             );
         
-            if (count($successfulPayments) === 0) return;
-        
-            $successfulPayment = $successfulPayments[0];
-    
-            if ($this->debug_mode) {
-                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Successful Payment ' . wc_print_r($successfulPayment, true));
+            if (count($successfulPayments) === 0) {
+                return new WP_Error(404, 'Can\'t find payment record to refund in Maya');
+            }
+
+            /** Reference numbers are just order ids, so prefer the payment this order recorded when it was paid. */
+            $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
+
+            if ($successfulPayment === null) {
+                return new WP_Error(404, 'This order\'s recorded payment was not found at Maya, so nothing was refunded. Check the payment on the Maya dashboard.');
             }
     
-            if (!$successfulPayment) {
-                return new WP_Error(404, 'Can\'t find payment record to refund in Paymaya');
+            if ($this->debug_mode) {
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '] Successful Payment ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($successfulPayment), true));
             }
     
             $paymentId = $successfulPayment['id'];
     
             /** Only void if payment is voidable and full amount */
             if ($successfulPayment['canVoid']) {
-                if ($amountValue === floatval($successfulPayment['amount'])) {
+                if (Cynder_Paymaya_Webhook_Guard::amounts_equal($amountValue, $successfulPayment['amount'])) {
 
                     $response = $this->client->voidPayment($paymentId, empty($reason) ? 'Merchant manually voided' : $reason);
 
                     if (array_key_exists("error", $response)) {
-                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . $response['error']);
+                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                         return false;
                     }
             
@@ -634,7 +774,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 $response = $this->client->refundPayment($paymentId, $payload);
         
                 if (array_key_exists("error", $response)) {
-                    wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT . '] ' . $response['error']);
+                    wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                     return false;
                 }
         
@@ -660,8 +800,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 return new WP_Error(400, 'No authorized payment to refund');
             }
 
-            $authorizedPayment = $authorizedPayments[0];
-            $authorizedFullAmount = floatval($authorizedPayment['amount']);
+            $authorizedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedPayments, $order->get_transaction_id());
+
+            if ($authorizedPayment === null) {
+                return new WP_Error(404, 'This order\'s recorded payment was not found at Maya, so nothing was refunded. Check the payment on the Maya dashboard.');
+            }
 
             /**
              * If there are no other payments other than the authorized payment,
@@ -676,11 +819,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                     return new WP_Error(400, 'Authorized payment can no longer be voided');
                 }
                 
-                if ($authorized && $authorizedFullAmount === $amountValue) {
+                if ($authorized && Cynder_Paymaya_Webhook_Guard::amounts_equal($authorizedPayment['amount'], $amountValue)) {
                     $response = $this->client->voidPayment($paymentId, empty($reason) ? 'Merchant manually voided' : $reason);
 
                     if (array_key_exists("error", $response)) {
-                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . $response['error']);
+                        wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_PROCESS_REFUND_BLOCK . '][' . CYNDER_PAYMAYA_VOID_PAYMENT_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                         return false;
                     }
 
@@ -832,7 +975,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
             if (array_key_exists("error", $response)) {
                 $errorIdentifier = $actionType === 'void' ? CYNDER_PAYMAYA_VOID_PAYMENT_EVENT : CYNDER_PAYMAYA_REFUND_PAYMENT_EVENT;
-                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_MASS_REFUND_PAYMENT_BLOCK . '][' . $errorIdentifier . '] ' . $response['error']);
+                wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_MASS_REFUND_PAYMENT_BLOCK . '][' . $errorIdentifier . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($response));
                 return new WP_Error(400, 'Something went wrong with the refund. Check your Maya merchant dashboard for actual balances.');
             }
         }
@@ -930,6 +1073,14 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return false;
         }
 
+        /**
+         * Sandbox skips the IP allowlist by default (tunnels and local dev hide the sender IP); timestamp and signature
+         * are still enforced above. Return false from this filter to enforce the sandbox IPs as well.
+         */
+        if (apply_filters('cynder_paymaya_skip_webhook_ip_check', $this->sandbox === 'yes', $source)) {
+            return true;
+        }
+
         $mayaIps = $this->sandbox === 'yes'
             ? array('13.229.160.234', '3.1.199.75')
             : array('18.138.50.235', '3.1.207.200');
@@ -976,7 +1127,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payment = json_decode($requestBody, true);
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payment Webhook payload ' . wc_print_r($payment, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payment Webhook payload ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payment), true));
         }
 
         if (!Cynder_Paymaya_Webhook_Guard::is_valid_webhook_payload($payment)) {
@@ -1010,6 +1161,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         if (empty($authorizationType) || $authorizationType === 'none') {
             /** For non-manual capture payments: */
 
+            list($failureAction, $failureNote) = Cynder_Paymaya_Webhook_Guard::failure_decision($status, $order->is_paid(), false);
+
             if ($order->is_paid()) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Cannot process payment ' . $transactionRefNumber . ' with ' . $status . ' status.');
 
@@ -1039,22 +1192,8 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
                 }
 
                 $order->payment_complete($confirmedPayment['id']);
-            } else if ($status === 'PAYMENT_FAILED' || $status === 'PAYMENT_EXPIRED' || $status === 'AUTH_FAILED') {
-                $note = '';
-
-                switch ($status) {
-                    case 'PAYMENT_EXPIRED': {
-                        $note = 'Payment expired';
-                        break;
-                    }
-                    case 'AUTH_FAILED':
-                    case 'PAYMENT_FAILED':
-                    default: {
-                        $note = 'Payment failed';
-                    }
-                }
-
-                $order->update_status('failed', $note, true);
+            } else if ($failureAction === 'failed') {
+                $order->update_status('failed', $failureNote, true);
             } else {
                 wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Amount mismatch. Open payment details on Maya dashboard with txn ref number ' . $transactionRefNumber);
             }
@@ -1062,7 +1201,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             /** Process manual captures */
 
             /** A failure webhook must never change an order that is already paid. */
-            if ($order->is_paid() && in_array($status, array('PAYMENT_EXPIRED', 'AUTH_FAILED', 'PAYMENT_FAILED'), true)) {
+            list($failureAction, $failureNote) = Cynder_Paymaya_Webhook_Guard::failure_decision($status, $order->is_paid(), true);
+
+            if ($failureAction === 'ignore') {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Order ' . $referenceNumber . ' is already paid. Ignoring ' . $status . ' status for payment ' . $transactionRefNumber);
                 $order->add_order_note('Ignored failed payment ' . $transactionRefNumber . ' (' . $status . '): order is already paid');
 
@@ -1073,7 +1214,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             $payments = $this->client->getPaymentViaRrn($referenceNumber, self::WEBHOOK_LOOKUP_TIMEOUT);
 
             if ($this->debug_mode) {
-                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
+                wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
             }
 
             list($outcome, $authorizedPayment) = Cynder_Paymaya_Webhook_Guard::classify_manual_capture($payments, floatval($order->get_total()), $order->get_currency(), $referenceNumber, $status);
@@ -1124,19 +1265,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             } else {
                 $note = '';
 
-                switch ($status) {
-                    case 'PAYMENT_SUCCESS': {
-                        $note = 'Successful payment ' . $payment['id'];
-                        break;
-                    }
-                    case 'PAYMENT_EXPIRED':
-                    case 'AUTH_FAILED':
-                    case 'PAYMENT_FAILED': {
-                        $note = 'Failed payment ' . $payment['id'];
+                if ($status === 'PAYMENT_SUCCESS') {
+                    $note = 'Successful payment ' . $payment['id'];
+                } else if ($failureAction === 'on-hold') {
+                    $note = $failureNote . ' ' . $payment['id'];
 
-                        $order->update_status('on-hold');
-                        break;
-                    }
+                    $order->update_status('on-hold');
                 }
 
                 if (!empty($note)) {
@@ -1149,6 +1283,11 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     }
 
     function wc_order_item_add_action_buttons_callback($order) {
+        /** Runs for every order in the admin. Without this, other gateways' orders trigger a Maya lookup by order number and can show another payment's Void or Capture controls. */
+        if ($order->get_payment_method() !== $this->id) {
+            return;
+        }
+
         if ($this->debug_mode) {
             wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Total refunded for order ID ' . $order->get_id() . ': ' . $order->get_total_refunded());
         }
@@ -1156,12 +1295,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
             return;
         }
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payments via RRN ' . wc_print_r($payments, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payments via RRN ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($payments), true));
         }
     
         $successfulPayments = array_values(
@@ -1176,8 +1315,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             )
         );
     
-        if (count($successfulPayments) !== 0) {
-            $successfulPayment = $successfulPayments[0];
+        $successfulPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($successfulPayments, $order->get_transaction_id());
+
+        if ($successfulPayment !== null) {
         
             if ($this->debug_mode) {
                 wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Payment ID ' . $successfulPayment['id'] . ' canRefund: ' . ($successfulPayment['canRefund'] == true ? 'true' : 'false'));
@@ -1211,10 +1351,10 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         );
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorized payments ' . wc_print_r($authorizedPayments, true));
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_ADD_ACTION_BUTTONS_BLOCK . '] Authorized payments ' . wc_print_r(Cynder_Paymaya_Webhook_Guard::redact_for_log($authorizedPayments), true));
         }
 
-        if (count($authorizedPayments) !== 0) {
+        if (Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedPayments, $order->get_transaction_id()) !== null) {
             echo '<button type="button" class="button capture-items">Capture</button>';
         }
     }
@@ -1229,7 +1369,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $payments = $this->client->getPaymentViaRrn($orderId);
 
         if (array_key_exists("error", $payments)) {
-            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_AFTER_TOTALS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . $payments['error']);
+            wc_get_logger()->log('error', '[' . CYNDER_PAYMAYA_AFTER_TOTALS_BLOCK . '][' . CYNDER_PAYMAYA_GET_PAYMENTS_EVENT . '] ' . Cynder_Paymaya_Webhook_Guard::error_message($payments));
             return;
         }
     
@@ -1261,7 +1401,12 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             return;
         }
 
-        $authorizedOrCapturedPayment = $authorizedOrCapturedPayments[0];
+        $authorizedOrCapturedPayment = Cynder_Paymaya_Webhook_Guard::pick_payment($authorizedOrCapturedPayments, $order->get_transaction_id());
+
+        if ($authorizedOrCapturedPayment === null) {
+            return;
+        }
+
         $authorizedAmount = $authorizedOrCapturedPayment['amount'];
         $capturedAmount = $authorizedOrCapturedPayment['capturedAmount'];
         $balance = floatval($authorizedAmount) - floatval($capturedAmount);
@@ -1355,8 +1500,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
     /**
      * Maya retries a webhook only 4 times over about an hour. If we still could not confirm a payment by then,
      * re-check once more later (Action Scheduler ships with WooCommerce) so a paid order is not left pending.
+     * $delay defaults to 2 hours; the customer's success redirect uses a shorter one (see cynder_paymaya_catch_redirect).
      */
-    function schedule_reconcile($order, $attempt = 1) {
+    function schedule_reconcile($order, $attempt = 1, $delay = null) {
         if (!function_exists('as_schedule_single_action') || !function_exists('as_has_scheduled_action')) {
             return;
         }
@@ -1364,7 +1510,7 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
         $args = array($order->get_id(), $attempt);
 
         if (!as_has_scheduled_action(self::RECONCILE_HOOK, $args)) {
-            as_schedule_single_action(time() + 2 * HOUR_IN_SECONDS, self::RECONCILE_HOOK, $args);
+            as_schedule_single_action(time() + ($delay === null ? 2 * HOUR_IN_SECONDS : (int) $delay), self::RECONCILE_HOOK, $args);
         }
     }
 
@@ -1404,13 +1550,17 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
 
     function verify_signature_v1($payload, $signature, $nonce) {
         $flatString = $this->flatten_object_to_string($payload);
-        sort($flatString);
+        /** Binary string order. Maya's reference code uses JavaScript sort() (UTF-16 code units), which is the same for the ASCII these payloads contain. */
+        sort($flatString, SORT_STRING);
         $concatenatedFlatString = implode('&', $flatString);
         
         $verifyString = "{$concatenatedFlatString}&nonce={$nonce}";
 
         if ($this->debug_mode) {
-            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Flattened Payload: '. $verifyString);
+            /** Logged with buyer data masked, so it will not match the signature byte for byte; the field list and order are what matter when debugging. */
+            $loggedFlat = $this->flatten_object_to_string(Cynder_Paymaya_Webhook_Guard::redact_for_log($payload));
+            sort($loggedFlat, SORT_STRING);
+            wc_get_logger()->log('info', '[' . CYNDER_PAYMAYA_HANDLE_PAYMENT_WEBHOOK_REQUEST_BLOCK . '] Flattened Payload: ' . implode('&', $loggedFlat) . '&nonce=' . $nonce);
         }
         
         if ($this->sandbox === 'yes') {
@@ -1424,6 +1574,9 @@ class Cynder_Paymaya_Gateway extends WC_Payment_Gateway
             }
             $publicKeys = MAYA_WEBHOOK_PUBLIC_KEYS_PRODUCTION;
         }
+
+        /** Maya rotates these keys; sites can add the new ones before a plugin update ships them. */
+        $publicKeys = (array) apply_filters('cynder_paymaya_webhook_public_keys', $publicKeys, $this->sandbox === 'yes');
 
         return Cynder_Paymaya_Webhook_Guard::is_valid_signature($verifyString, $signature, $publicKeys);
     }
