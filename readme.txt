@@ -3,7 +3,7 @@ Tags: payments, credit card
 Requires at least: 5.3
 Tested up to: 7.1
 Requires PHP: 7.2.5
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -57,25 +57,20 @@ Automatic updates should work like a charm; as always though, ensure you backup 
 
 == Changelog ==
 
-= Unreleased =
+= 1.5.0 =
+*Release Date - November 18, 2026*
 
-* Fix: an empty or unexpected response from Maya no longer causes a fatal error on PHP 8 at checkout, refund, void, capture or settings save.
-* Fix: saving new API keys now registers webhooks with the new keys straight away (previously it needed a second save).
-* Security: the secret key is masked and never shown after saving, with an option to remove it; API keys can be set in wp-config.php instead of the database.
+* Fix: orders no longer stay "Pending payment" when your Maya account has no webhooks. Saving the settings, or saving new API keys, now registers them straight away.
+* Fix: an invalid webhook URL no longer deletes your existing webhooks. Nothing is changed, and you are told which URLs to fix or which webhooks Maya rejected.
+* Plugin updates now replace only the plugin's own webhooks, not every webhook on your Maya account.
+* If the payment webhook never arrives, the order is re-checked with Maya 75 minutes after the customer returns from checkout (normal payments only, not manual capture).
+* Cancelled Maya payments now mark unpaid orders as failed so the customer can retry.
+* Fix: an empty or unexpected reply from Maya no longer crashes checkout, refunds, voids, captures or the settings page on PHP 8. If Maya rejects a checkout, the customer sees a message instead of a blank page.
+* Fix: refunds, voids and captures always use the payment recorded for that order, and Void and Capture controls appear only on Maya orders.
+* Security: the secret key is masked after saving, and you can set your API keys in `wp-config.php` instead of the database.
 * Security: debug logs mask buyer names, emails, phone numbers, addresses and order keys.
-* Plugin updates now replace only the plugin's own webhooks instead of deleting every webhook on the Maya account.
-* If the payment webhook does not arrive, the order is re-checked with Maya 75 minutes after the customer returns from checkout.
-* Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified). The `cynder_paymaya_skip_webhook_ip_check` filter can turn it back on.
-* New `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
-* Fix: saving the settings can register webhooks again when your Maya account has none. Previously Maya's "Webhook does not exist" reply to the list request was treated as a failure, so webhooks were never re-created and paid orders stayed "Pending payment".
-* Fix: webhook URLs are checked before anything is changed. An invalid URL used to delete the existing webhooks and then fail to create new ones; now nothing is touched and you are told which URLs to fix. If Maya rejects the new webhooks you are told which ones, so you know orders will not update.
-* Fix: if Maya rejects a checkout request, the customer now sees a message instead of a blank failure.
-* Fix: Maya order screens no longer look up payments for orders paid with other gateways, so Void and Capture controls only appear on Maya orders.
-* Fix: refunds, voids and captures act only on the payment recorded for the order, even if another payment shares its reference number, and report an error when it is not found.
-* Fix: capture checks the order exists and was paid with Maya before contacting Maya.
-* Fix: an unexpected error response from Maya can no longer crash the settings page or the capture button.
-* Cancelled Maya payments now mark unpaid orders as failed so the customer can retry. Plugin updates and saving settings register the new PAYMENT_CANCELLED webhook.
-* An unrecognised payment return status now sends the customer to the order's pay page instead of a blank page.
+* Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified). The `cynder_paymaya_skip_webhook_ip_check` filter turns it back on.
+* Developers: new `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
 * Compatible with PHP 8.2 to 8.5. Tested with WordPress 7.1.3 and WooCommerce 11.2.1.
 
 = 1.4.1 =

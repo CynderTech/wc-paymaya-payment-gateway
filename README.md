@@ -23,7 +23,7 @@ With Maya Checkout, your website or app can directly accept credit and debit car
 ### Don't have an account yet? [Click here to get started](https://enterprise.paymaya.com/solutions/plugins/woocommerce)
 
 ### Version Compatibility
-This version (1.4.1) is currently compatible with the following WordPress and WooCommerce version:
+This version (1.5.0) is currently compatible with the following WordPress and WooCommerce version:
 * WordPress 7.1
 * WooCommerce 11.2.1
 * PHP 7.2.5 or later. Lint and the PHPUnit suite pass on PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12, the releases that fix CVE-2026-109618 and CVE-2026-109619. Keep PHP on a supported, patched release.
