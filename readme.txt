@@ -43,13 +43,40 @@ This gateway requires WooCommerce 3.9.3 and above.
 
 = Sandbox Mode =
 
-To test payments, enable **Sandbox Mode**. This will let you transact test payments and check if your WordPress and WooCommerce installation doesn't have conflicts with the plugin. Although **not required**, it is **highly recommended** to test your plugin installation first. You can find test API keys and credit cards [here](https://hackmd.io/@paymaya-pg/Checkout#Sandbox-Test-Credentials).
+To test payments, enable **Sandbox Mode**. This will let you transact test payments and check if your WordPress and WooCommerce installation doesn't have conflicts with the plugin. Although **not required**, it is **highly recommended** to test your plugin installation first. Use your own sandbox API keys from Maya Business Manager (Developer Sandbox Application Management) rather than the shared test keys in Maya's docs: shared keys are used by many developers at once, so webhooks get overwritten and orders stay "Pending payment". Test cards are listed in the [Maya sandbox guide](https://developers.maya.ph/docs/sandbox-credentials-and-cards-guide).
+
+In Sandbox Mode the webhook source-IP check is skipped so that tunnels such as ngrok work; the webhook signature and timestamp are still verified.
+
+= Keeping your API keys out of the database =
+
+The secret key is never shown again after it is saved; leave the field blank to keep it. To keep the keys out of the database entirely, add `define('CYNDER_PAYMAYA_PUBLIC_KEY', '...');` and `define('CYNDER_PAYMAYA_SECRET_KEY', '...');` to `wp-config.php`, then save the settings once so any copy already in the database is removed.
 
 = Updating =
 
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= Unreleased =
+
+* Fix: an empty or unexpected response from Maya no longer causes a fatal error on PHP 8 at checkout, refund, void, capture or settings save.
+* Fix: saving new API keys now registers webhooks with the new keys straight away (previously it needed a second save).
+* Security: the secret key is masked and never shown after saving, with an option to remove it; API keys can be set in wp-config.php instead of the database.
+* Security: debug logs mask buyer names, emails, phone numbers, addresses and order keys.
+* Plugin updates now replace only the plugin's own webhooks instead of deleting every webhook on the Maya account.
+* If the payment webhook does not arrive, the order is re-checked with Maya 75 minutes after the customer returns from checkout.
+* Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified). The `cynder_paymaya_skip_webhook_ip_check` filter can turn it back on.
+* New `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
+* Fix: saving the settings can register webhooks again when your Maya account has none. Previously Maya's "Webhook does not exist" reply to the list request was treated as a failure, so webhooks were never re-created and paid orders stayed "Pending payment".
+* Fix: webhook URLs are checked before anything is changed. An invalid URL used to delete the existing webhooks and then fail to create new ones; now nothing is touched and you are told which URLs to fix. If Maya rejects the new webhooks you are told which ones, so you know orders will not update.
+* Fix: if Maya rejects a checkout request, the customer now sees a message instead of a blank failure.
+* Fix: Maya order screens no longer look up payments for orders paid with other gateways, so Void and Capture controls only appear on Maya orders.
+* Fix: refunds, voids and captures act only on the payment recorded for the order, even if another payment shares its reference number, and report an error when it is not found.
+* Fix: capture checks the order exists and was paid with Maya before contacting Maya.
+* Fix: an unexpected error response from Maya can no longer crash the settings page or the capture button.
+* Cancelled Maya payments now mark unpaid orders as failed so the customer can retry. Plugin updates and saving settings register the new PAYMENT_CANCELLED webhook.
+* An unrecognised payment return status now sends the customer to the order's pay page instead of a blank page.
+* Compatible with PHP 8.2 to 8.5. Tested with WordPress 7.1.3 and WooCommerce 11.2.1.
 
 = 1.4.1 =
 *Release Date - October 2, 2026*

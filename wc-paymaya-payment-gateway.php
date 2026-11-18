@@ -11,7 +11,7 @@
  * Tested up to: 7.1
  * Requires PHP: 7.2.5
  * WC requires at least: 3.9.3
- * WC tested up to: 11.0.1
+ * WC tested up to: 11.2.1
  *
  * @category Plugin
  * @package  CynderTech

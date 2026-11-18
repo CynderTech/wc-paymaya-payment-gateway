@@ -25,7 +25,28 @@ With Maya Checkout, your website or app can directly accept credit and debit car
 ### Version Compatibility
 This version (1.4.1) is currently compatible with the following WordPress and WooCommerce version:
 * WordPress 7.1
-* WooCommerce 11.0.1
+* WooCommerce 11.2.1
+* PHP 7.2.5 or later. Lint and the PHPUnit suite pass on PHP 8.2.35, 8.3.36, 8.4.27 and 8.5.12, the releases that fix CVE-2026-109618 and CVE-2026-109619. Keep PHP on a supported, patched release.
+
+### Keeping your API keys out of the database
+The secret key is never shown again after it is saved; leave the field blank to keep it, or tick **Remove the saved key** to clear it. A key that does not start with `pk-` / `sk-` is still saved but flagged, because the usual cause is a browser autofilling the wrong field. To keep the keys out of the database entirely, define them in `wp-config.php`. The settings fields are then locked, and the next time you save the settings any copy already in the database is removed (so save once after adding the constants; if you later remove the constants, enter the keys again):
+```php
+define('CYNDER_PAYMAYA_PUBLIC_KEY', 'pk-...');
+define('CYNDER_PAYMAYA_SECRET_KEY', 'sk-...');
+```
+
+### Testing with Sandbox Mode
+* Use **your own sandbox keys** from Maya Business Manager (Developer Sandbox Application Management). The shared test keys published in Maya's docs are used by many developers at once: other people's payments show up under your order numbers, and their settings changes overwrite your webhooks, so orders stay "Pending payment".
+* In Sandbox Mode the webhook source-IP check is skipped, so tunnels such as ngrok work. The webhook signature and timestamp are still verified. Production always checks the IP. Return `false` from the `cynder_paymaya_skip_webhook_ip_check` filter to enforce the sandbox IPs too.
+* Webhook URLs are saved with the site address at the time you save. If your tunnel URL changes, update the three webhook URL fields and click **Save** to register the new URLs with Maya.
+
+### Debug Mode
+Debug logs mask buyer names, emails, phone numbers and addresses, but still contain order and payment details. Turn Debug Mode off when you are done.
+
+### Developer hooks
+* `cynder_paymaya_webhook_source_ip` (filter) - override the resolved webhook sender IP.
+* `cynder_paymaya_skip_webhook_ip_check` (filter) - whether to skip the webhook source-IP check. Defaults to `true` in Sandbox Mode and `false` in production.
+* `cynder_paymaya_webhook_public_keys` (filter) - add or replace Maya's webhook verification public keys (e.g. after Maya rotates them). Receives the key list and whether Sandbox Mode is on.
 
 ### Webhooks behind a proxy or CDN
 Maya only sends webhooks from its own IP addresses, so the plugin checks the sender's IP. The IP used is the connection address; client-settable headers like `X-Forwarded-For` are not trusted on their own.
