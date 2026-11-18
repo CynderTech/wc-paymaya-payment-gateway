@@ -3,7 +3,7 @@ Tags: payments, credit card
 Requires at least: 5.3
 Tested up to: 7.1
 Requires PHP: 7.2.5
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -43,13 +43,35 @@ This gateway requires WooCommerce 3.9.3 and above.
 
 = Sandbox Mode =
 
-To test payments, enable **Sandbox Mode**. This will let you transact test payments and check if your WordPress and WooCommerce installation doesn't have conflicts with the plugin. Although **not required**, it is **highly recommended** to test your plugin installation first. You can find test API keys and credit cards [here](https://hackmd.io/@paymaya-pg/Checkout#Sandbox-Test-Credentials).
+To test payments, enable **Sandbox Mode**. This will let you transact test payments and check if your WordPress and WooCommerce installation doesn't have conflicts with the plugin. Although **not required**, it is **highly recommended** to test your plugin installation first. Use your own sandbox API keys from Maya Business Manager (Developer Sandbox Application Management) rather than the shared test keys in Maya's docs: shared keys are used by many developers at once, so webhooks get overwritten and orders stay "Pending payment". Test cards are listed in the [Maya sandbox guide](https://developers.maya.ph/docs/sandbox-credentials-and-cards-guide).
+
+In Sandbox Mode the webhook source-IP check is skipped so that tunnels such as ngrok work; the webhook signature and timestamp are still verified.
+
+= Keeping your API keys out of the database =
+
+The secret key is never shown again after it is saved; leave the field blank to keep it. To keep the keys out of the database entirely, add `define('CYNDER_PAYMAYA_PUBLIC_KEY', '...');` and `define('CYNDER_PAYMAYA_SECRET_KEY', '...');` to `wp-config.php`, then save the settings once so any copy already in the database is removed.
 
 = Updating =
 
 Automatic updates should work like a charm; as always though, ensure you backup your site just in case.
 
 == Changelog ==
+
+= 1.5.0 =
+*Release Date - November 18, 2026*
+
+* Fix: orders no longer stay "Pending payment" when your Maya account has no webhooks. Saving the settings, or saving new API keys, now registers them straight away.
+* Fix: an invalid webhook URL no longer deletes your existing webhooks. Nothing is changed, and you are told which URLs to fix or which webhooks Maya rejected.
+* Plugin updates now replace only the plugin's own webhooks, not every webhook on your Maya account.
+* If the payment webhook never arrives, the order is re-checked with Maya 75 minutes after the customer returns from checkout (normal payments only, not manual capture).
+* Cancelled Maya payments now mark unpaid orders as failed so the customer can retry.
+* Fix: an empty or unexpected reply from Maya no longer crashes checkout, refunds, voids, captures or the settings page on PHP 8. If Maya rejects a checkout, the customer sees a message instead of a blank page.
+* Fix: refunds, voids and captures always use the payment recorded for that order, and Void and Capture controls appear only on Maya orders.
+* Security: the secret key is masked after saving, and you can set your API keys in `wp-config.php` instead of the database.
+* Security: debug logs mask buyer names, emails, phone numbers, addresses and order keys.
+* Sandbox Mode skips the webhook source-IP check (signature and timestamp are still verified). The `cynder_paymaya_skip_webhook_ip_check` filter turns it back on.
+* Developers: new `cynder_paymaya_webhook_public_keys` filter for Maya's webhook verification keys.
+* Compatible with PHP 8.2 to 8.5. Tested with WordPress 7.1.3 and WooCommerce 11.2.1.
 
 = 1.4.1 =
 *Release Date - October 2, 2026*
